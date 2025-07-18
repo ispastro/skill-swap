@@ -2,10 +2,10 @@
 
 // Register controller
 export const register = async (req, res) => {
-  const { name, email, password } = req.body;
+  const { username, email, password } = req.body;
 
   // 1. Check if all fields are provided
-  if (!name || !email || !password) {
+  if (!username || !email || !password) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
@@ -25,7 +25,7 @@ export const register = async (req, res) => {
     // 4. Create a new user in the database
     const user = await prisma.user.create({
       data: {
-        name,
+        username,
         email,
         password: hash,
       },

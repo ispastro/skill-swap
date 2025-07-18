@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import cors from 'cors';
 
 import prisma from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
@@ -11,7 +12,9 @@ dotenv.config();
 const app = express();
 
 // Middleware
-
+app.use(cors({
+  origin: '*',
+}));
 app.use(express.json());
 
 // API Routes
@@ -23,7 +26,7 @@ app.get('/', (req, res) => {
 });
 
 // Start Server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8000;
 
 const startServer = async () => {
   try {
@@ -32,7 +35,7 @@ const startServer = async () => {
     console.log('📦 Connected to the database successfully');
 
     app.listen(PORT, () => {
-      console.log(`⚡ Server running on http://localhost:${PORT}`);
+      console.log(`⚡ Server running on http://127.0.0.1:${PORT}`);
     });
   } catch (error) {
     console.error('❌ Failed to connect to the database', error);
