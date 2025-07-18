@@ -1,4 +1,9 @@
 
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
 // Register controller
 export const register = async (req, res) => {
@@ -10,14 +15,14 @@ export const register = async (req, res) => {
   }
 
   try {
-    // 2. Check if the user already exists in the DB
-    const exists = await prisma.user.findUnique({
+    // // 2. Check if the user already exists in the DB
+     const exists = await prisma.user.findUnique({
       where: { email },
-    });
+     });
 
-    if (exists) {
-      return res.status(400).json({ message: "User already exists" });
-    }
+     if (exists) {
+       return res.status(400).json({ message: "User already exists" });
+     }
 
     // 3. Hash the password
     const hash = await bcrypt.hash(password, 10);
