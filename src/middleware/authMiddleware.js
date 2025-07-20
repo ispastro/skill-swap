@@ -27,5 +27,4 @@ const authMiddleware = async (req, res, next) => {
     return res.status(401).json({ message: 'Unauthorized: Invalid token' });
   }
 };
-
-export default authMiddleware;
+export default authMiddleware; // export as 'protect' for consistency with other files
