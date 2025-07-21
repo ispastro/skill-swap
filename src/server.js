@@ -5,6 +5,7 @@ import cors from 'cors';
 import prisma from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
+import matchRoutes from './routes/matchRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +22,7 @@ app.use(express.json());
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/match', matchRoutes);
 
 // Root health check route (optional but handy)
 app.get('/', (req, res) => {

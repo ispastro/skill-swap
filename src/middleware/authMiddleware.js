@@ -15,7 +15,7 @@ const authMiddleware = async (req, res, next) => {
 
   try {
     // 4. Verify the token
-    
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET); // ⚠️ fixed typo from JWT_SECERET → JWT_SECRET
 
     // 5. Attach the user info to the request (you can now access req.user in protected routes)
