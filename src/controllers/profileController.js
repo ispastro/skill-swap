@@ -1,4 +1,5 @@
 import prisma from '../config/db.js';
+import { checkProfileCompletion } from '../utils/profileUtils.js';
 
 /**
  * Get the authenticated user's profile.
@@ -25,15 +26,13 @@ export const getUserProfile = async (req, res) => {
     }
 
     // Determine profile completion
-    const profileCompleted =
-      Boolean(user.bio) &&
-      Array.isArray(user.skillsHave) && user.skillsHave.length > 0 &&
-      Array.isArray(user.skillsWant) && user.skillsWant.length > 0;
+    const { profileCompleted, missing } = checkProfileCompletion(user);
 
     // Response if profile incomplete
     if (!profileCompleted) {
       return res.status(200).json({
         message: "📝 Your profile is incomplete. Please update it to unlock full features.",
+        missing,
         user: {
           username: user.username,
           email: user.email,
@@ -55,5 +54,41 @@ export const getUserProfile = async (req, res) => {
       message: "💥 Server error. Please try again later.",
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
+  }
+};
+
+export const updateUserProfile = async (req, res) => {
+  const userId = req.user.id;
+  const { bio, skillsHave, skillsWant } = req.body;
+
+  try {
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        bio,
+        skillsHave,
+        skillsWant,
+      },
+      select: {
+        username: true,
+        email: true,
+        bio: true,
+        skillsHave: true,
+        skillsWant: true,
+      },
+    });
+
+    const { profileCompleted, missing } = checkProfileCompletion(updatedUser);
+
+    res.status(200).json({
+      message: profileCompleted
+        ? "🎉 Profile updated successfully! You're all set!"
+        : "✅ Profile updated, but still incomplete",
+      user: updatedUser,
+      profileCompleted,
+      ...(profileCompleted ? {} : { missing }),
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };

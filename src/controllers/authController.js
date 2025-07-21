@@ -40,7 +40,7 @@ export const register = async (req, res) => {
     const token = jwt.sign(
       { id: user.id }, // use user.id (Postgres/Prisma)
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '3d' }
     );
 
     // 6. Return the token
@@ -82,7 +82,7 @@ export const login = async (req, res) => {
     const token = jwt.sign(
       { id: user.id },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '3d' }
     );
 
     // 5. Send token
