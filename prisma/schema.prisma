@@ -14,13 +14,35 @@ datasource db {
 }
 
 model User {
-  id          String     @id @default(uuid())
-  username    String     @db.VarChar(20)
-  email       String     @unique
-  password    String
-  bio         String?            
-  skillsHave  String[]   @default([])                       // Optional
-  skillsWant  String[]   @default([])                      // Optional
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id                String             @id @default(uuid())
+  username          String             @unique @db.VarChar(20) // Unique for mentions, login, etc.
+  email             String             @unique
+  password          String
+  bio               String?            @db.VarChar(255)        // Optional, max size good for UI display
+  skillsHave        String[]           @default([])
+  skillsWant        String[]           @default([])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  SentProposals     BarterProposal[]   @relation("SentProposals")
+  ReceivedProposals BarterProposal[]   @relation("ReceivedProposals")
+}
+
+
+model BarterProposal {
+  id           String   @id @default(uuid())
+  fromUser     User     @relation("SentProposals", fields: [fromUserId], references: [id])
+  fromUserId   String
+  toUser       User     @relation("ReceivedProposals", fields: [toUserId], references: [id])
+  toUserId     String
+  offer        String   @db.VarChar(255) // Describe what the user offers
+  request      String   @db.VarChar(255) // Describe what the user wants in return
+  status       ProposalStatus @default(pending)
+  createdAt    DateTime @default(now())
+}
+
+enum ProposalStatus {
+  pending
+  accepted
+  declined
 }
