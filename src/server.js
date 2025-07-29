@@ -23,7 +23,7 @@ app.use(express.json());
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
-app.use('/api/match', matchRoutes);
+app.use('/api/matches', matchRoutes);
 app.use('/api/barter', barterRoutes);
 // Root health check route (optional but handy)
 app.get('/', (req, res) => {

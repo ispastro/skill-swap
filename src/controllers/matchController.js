@@ -1,27 +1,53 @@
 import prisma from '../config/db.js';
 import { suggestSkills } from '../utils/suggestSkills.js';
+import Fuse from 'fuse.js';
 
 function normalizeSkills(skills) {
-  return skills.map(skill => skill.toLowerCase().trim());
+  if (!skills || !Array.isArray(skills)) return [];
+  return skills.map(skill =>
+    skill.toLowerCase().trim().replace(/[^a-z0-9+\-# ]/gi, '')
+  );
 }
 
-function calculateMatchScore(userA, userB) {
-  const skillsTheyHave = normalizeSkills(userB.skillsHave);
-  const skillsIWant = normalizeSkills(userA.skillsWant);
+function fuzzyMatch(skillsA, skillsB) {
+  const fuse = new Fuse(skillsB, {
+    threshold: 0.4, // adjust for strictness
+    includeScore: true,
+    keys: [],
+  });
 
+  return skillsA.flatMap(skill => {
+    const result = fuse.search(skill);
+    if (result.length > 0) {
+      return result[0].item;
+    }
+    return [];
+  });
+}
+
+function calculateWeightedMatchScore(userA, userB) {
+  const skillsTheyHave = normalizeSkills(userB.skillsHave);
   const skillsTheyWant = normalizeSkills(userB.skillsWant);
   const skillsIHave = normalizeSkills(userA.skillsHave);
+  const skillsIWant = normalizeSkills(userA.skillsWant);
 
-  const matchedHave = skillsTheyHave.filter(skill => skillsIWant.includes(skill));
-  const matchedWant = skillsTheyWant.filter(skill => skillsIHave.includes(skill));
+  const matchedHave = fuzzyMatch(skillsIWant, skillsTheyHave); // what I want, they have
+  const matchedWant = fuzzyMatch(skillsIHave, skillsTheyWant); // what they want, I have
 
-  const totalMatches = matchedHave.length + matchedWant.length;
+  // Weighting: mutual match = more valuable
+  const weightedScore = matchedHave.length * 2 + matchedWant.length * 2;
 
   return {
-    matchScore: totalMatches,
+    matchScore: weightedScore,
     matchedHave,
     matchedWant
   };
+}
+
+function getConfidenceLabel(score) {
+  if (score >= 8) return '🔥 Strong Match';
+  if (score >= 4) return '👌 Medium Match';
+  return '🙂 Light Match';
 }
 
 export const findSkillsMatches = async (req, res) => {
@@ -48,16 +74,17 @@ export const findSkillsMatches = async (req, res) => {
     });
 
     const matches = allUsers.map(user => {
-      const { matchScore, matchedHave, matchedWant } = calculateMatchScore(currentUser, user);
+      const { matchScore, matchedHave, matchedWant } = calculateWeightedMatchScore(currentUser, user);
       return {
         user,
         matchScore,
         matchedHave,
-        matchedWant
+        matchedWant,
+        matchConfidence: getConfidenceLabel(matchScore),
       };
     })
-    .filter(match => match.matchScore > 0)
-    .sort((a, b) => b.matchScore - a.matchScore);
+      .filter(match => match.matchScore > 0)
+      .sort((a, b) => b.matchScore - a.matchScore);
 
     const aiSuggestions = suggestSkills(currentUser.skillsHave);
 
@@ -65,11 +92,12 @@ export const findSkillsMatches = async (req, res) => {
       message: matches.length > 0 ? "✅ Matches found!" : "❌ No mutual matches yet",
       totalMatches: matches.length,
       suggestions: aiSuggestions,
-      matches: matches.map(({ user, matchScore, matchedHave, matchedWant }) => ({
+      matches: matches.map(({ user, matchScore, matchedHave, matchedWant, matchConfidence }) => ({
         ...user,
         matchScore,
         matchedHave,
-        matchedWant
+        matchedWant,
+        matchConfidence
       }))
     });
 
