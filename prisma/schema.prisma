@@ -26,19 +26,43 @@ model User {
 
   SentProposals     BarterProposal[]   @relation("SentProposals")
   ReceivedProposals BarterProposal[]   @relation("ReceivedProposals")
+  SentChats         ChatSession[]      @relation("SentChats")
+  ReceivedChats     ChatSession[]      @relation("ReceivedChats")
+  SentMessages      Message[]          @relation("SentMessages")
+  ReceivedMessages  Message[]          @relation("ReceivedMessages")
 }
 
-
 model BarterProposal {
-  id           String   @id @default(uuid())
-  fromUser     User     @relation("SentProposals", fields: [fromUserId], references: [id])
+  id           String         @id @default(uuid())
+  fromUser     User           @relation("SentProposals", fields: [fromUserId], references: [id])
   fromUserId   String
-  toUser       User     @relation("ReceivedProposals", fields: [toUserId], references: [id])
+  toUser       User           @relation("ReceivedProposals", fields: [toUserId], references: [id])
   toUserId     String
-  offer        String   @db.VarChar(255) // Describe what the user offers
-  request      String   @db.VarChar(255) // Describe what the user wants in return
+  offer        String         @db.VarChar(255) // Describe what the user offers
+  request      String         @db.VarChar(255) // Describe what the user wants in return
   status       ProposalStatus @default(pending)
-  createdAt    DateTime @default(now())
+  createdAt    DateTime       @default(now())
+}
+
+model ChatSession {
+  id          String      @id @default(uuid())
+  initiatorId String
+  recipientId String
+  createdAt   DateTime    @default(now())
+  initiator   User        @relation("SentChats", fields: [initiatorId], references: [id])
+  recipient   User        @relation("ReceivedChats", fields: [recipientId], references: [id])
+  messages    Message[]
+}
+
+model Message {
+  id          String      @id @default(uuid())
+  chatId      String
+  senderId    String
+  content     String      @db.VarChar(1000) // Allow longer messages
+  createdAt   DateTime    @default(now())
+  chat        ChatSession @relation(fields: [chatId], references: [id])
+  sender      User        @relation("SentMessages", fields: [senderId], references: [id], map: "message_sender_fkey")
+  recipient   User        @relation("ReceivedMessages", fields: [senderId], references: [id], map: "message_recipient_fkey")
 }
 
 enum ProposalStatus {
