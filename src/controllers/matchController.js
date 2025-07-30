@@ -2,14 +2,14 @@ import prisma from '../config/db.js';
 import { suggestSkills } from '../utils/suggestSkills.js';
 import Fuse from 'fuse.js';
 
-function normalizeSkills(skills) {
+export function normalizeSkills(skills) {
   if (!skills || !Array.isArray(skills)) return [];
   return skills.map(skill =>
     skill.toLowerCase().trim().replace(/[^a-z0-9+\-# ]/gi, '')
   );
 }
 
-function fuzzyMatch(skillsA, skillsB) {
+export function fuzzyMatch(skillsA, skillsB) {
   const fuse = new Fuse(skillsB, {
     threshold: 0.4, // adjust for strictness
     includeScore: true,
@@ -25,7 +25,7 @@ function fuzzyMatch(skillsA, skillsB) {
   });
 }
 
-function calculateWeightedMatchScore(userA, userB) {
+export function calculateMatchScore(userA, userB) {
   const skillsTheyHave = normalizeSkills(userB.skillsHave);
   const skillsTheyWant = normalizeSkills(userB.skillsWant);
   const skillsIHave = normalizeSkills(userA.skillsHave);
@@ -44,7 +44,7 @@ function calculateWeightedMatchScore(userA, userB) {
   };
 }
 
-function getConfidenceLabel(score) {
+export function getConfidenceLabel(score) {
   if (score >= 8) return '🔥 Strong Match';
   if (score >= 4) return '👌 Medium Match';
   return '🙂 Light Match';
