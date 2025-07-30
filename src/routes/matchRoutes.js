@@ -11,7 +11,7 @@ import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.get('/', authMiddleware, findSkillsMatches);
+router.get('/matches', authMiddleware, findSkillsMatches);
 router.post('/notify-matches',authMiddleware,  notifyNewMatches);
 
 
