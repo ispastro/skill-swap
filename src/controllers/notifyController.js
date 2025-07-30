@@ -1,6 +1,6 @@
-import  prisma  from '../config/db';
+import  prisma  from '../config/db.js';
 import  winston from 'winston';
-import  { calculateMatchScore } from './matchController';
+import  { calculateMatchScore } from './matchController.js';
 
 const logger = winston.createLogger({
   level: 'info',
@@ -12,7 +12,7 @@ const logger = winston.createLogger({
 });
 
 // Notify users of new matches after profile update
-const notifyNewMatches = async (req, res) => {
+export const notifyNewMatches = async (req, res) => {
   try {
     const currentUser = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -61,4 +61,3 @@ const notifyNewMatches = async (req, res) => {
   }
 };
 
-module.exports = { notifyNewMatches };
