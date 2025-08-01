@@ -30,6 +30,8 @@ model User {
   ReceivedChats     ChatSession[]      @relation("ReceivedChats")
   SentMessages      Message[]          @relation("SentMessages")
   ReceivedMessages  Message[]          @relation("ReceivedMessages")
+  SentNotifications Notification[]     @relation("SentNotifications")
+  ReceivedNotifications Notification[] @relation("ReceivedNotifications")
 }
 
 model BarterProposal {
@@ -58,11 +60,23 @@ model Message {
   id          String      @id @default(uuid())
   chatId      String
   senderId    String
-  content     String      @db.VarChar(1000) // Allow longer messages
+  recipientId String                         
+  content     String      @db.VarChar(1000)
   createdAt   DateTime    @default(now())
   chat        ChatSession @relation(fields: [chatId], references: [id])
-  sender      User        @relation("SentMessages", fields: [senderId], references: [id], map: "message_sender_fkey")
-  recipient   User        @relation("ReceivedMessages", fields: [senderId], references: [id], map: "message_recipient_fkey")
+  sender      User        @relation("SentMessages", fields: [senderId], references: [id])
+  recipient   User        @relation("ReceivedMessages", fields: [recipientId], references: [id])
+}
+
+
+model Notification {
+  id          String   @id @default(uuid())
+  senderId    String
+  recipientId String
+  message     String   @db.VarChar(255)
+  createdAt   DateTime @default(now())
+  sender      User     @relation("SentNotifications", fields: [senderId], references: [id], map: "notification_sender_fkey")
+  recipient   User     @relation("ReceivedNotifications", fields: [recipientId], references: [id], map: "notification_recipient_fkey")
 }
 
 enum ProposalStatus {

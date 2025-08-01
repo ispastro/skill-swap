@@ -1,63 +1,82 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import {Server} from 'socket.io';
-
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import prisma from './config/db.js';
+import redis from './config/redisClient.js'; // Ensure this is correctly set up
 import authRoutes from './routes/authRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import matchRoutes from './routes/matchRoutes.js';
 import barterRoutes from './routes/barterRoutes.js';
-import {createServer} from  'http';
-
+import chatRoutes from './routes/chatRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import { notifyNewMatches } from './controllers/notifyController.js';
+import authMiddleware from './middleware/authMiddleware.js';
 
 // Load environment variables
 dotenv.config();
 
-// Initialize Express app
+// Initialize Express app and HTTP server
 const app = express();
-
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+});
 
 // Middleware
-app.use(cors({
-  origin: '*',
-}));
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// Create HTTP server for Socket.IO
-const httpServer = createServer(app);
-// Initialize Socket.IO
-const io = new Server(httpServer, {
-  cors:{
-    origin: '*',
-    methods: ['GET', 'POST'],
-
-  }
+// Attach io to requests for WebSocket events
+app.use((req, res, next) => {
+  req.io = io;
+  next();
 });
-
-
-// Socket.IO connection
-io.on('connection', (socket)=>{
-  console.log(`user is connected ${socket.id}`)
-});
-//Socket.IO disconnect 
-
-io.on('disconnect', (socket)=>{
-  console.log(`user is disconnected ${socket.id}`)
-})
-
-
-
 
 // API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/match', matchRoutes);
-app.use('/api/barter', barterRoutes);
-// Root health check route (optional but handy)
+app.use('/api/profile', authMiddleware, profileRoutes);
+app.use('/api/match', authMiddleware, matchRoutes);
+app.use('/api/barter', authMiddleware, barterRoutes);
+app.use('/api/chats', authMiddleware, chatRoutes);
+app.use('/api/notifications', authMiddleware, notificationRoutes);
+
+
+
+// Root health check route
 app.get('/', (req, res) => {
   res.send('SkillSwap API is running 🚀');
 });
+
+// WebSocket setup
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+  socket.on('join', (userId) => {
+    socket.join(userId);
+    console.log(`User ${userId} joined room`);
+  });
+  socket.on('joinChat', (chatId) => {
+    socket.join(chatId);
+    console.log(`User joined chat room: ${chatId}`);
+  });
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
+// redis set up
+app.get('/set', async (req, res) => {
+  await redis.set('greeting', 'Hello from Redis!');
+  res.send('Key set!');
+});
+
+app.get('/get', async (req, res) => {
+  const value = await redis.get('greeting');
+  res.send(`Value: ${value}`);
+});
+
+
 
 // Start Server
 const PORT = process.env.PORT || 8000;
@@ -73,9 +92,8 @@ const startServer = async () => {
     });
   } catch (error) {
     console.error('❌ Failed to connect to the database', error);
-    process.exit(1); // Exit if DB connection fails
+    process.exit(1);
   }
 };
 
 startServer();
-
