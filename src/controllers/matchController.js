@@ -25,7 +25,7 @@ export function fuzzyMatch(skillsA, skillsB) {
   });
 }
 
-export function calculateMatchScore(userA, userB) {
+export function calculateWeightedMatchScore(userA, userB) {
   const skillsTheyHave = normalizeSkills(userB.skillsHave);
   const skillsTheyWant = normalizeSkills(userB.skillsWant);
   const skillsIHave = normalizeSkills(userA.skillsHave);
