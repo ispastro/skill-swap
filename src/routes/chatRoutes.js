@@ -6,8 +6,8 @@ import  {
   sendMessage,
   validateChatInitiation,
   validateMessage,
- } from '../controllers/chatController';
-const authMiddleware = require('../middleware/authMiddleware');
+ } from '../controllers/chatController.js';
+import authMiddleware from '../middleware/authMiddleware.js'; 
 
 const router = express.Router();
 
@@ -15,5 +15,4 @@ router.post('/', validateChatInitiation, authMiddleware, initiateChat);
 router.get('/:userId', authMiddleware, getChats);
 router.get('/:chatId/messages', validateMessage, authMiddleware, getMessages);
 router.post('/:chatId/messages', validateMessage, authMiddleware, sendMessage);
-
-module.exports = router;
+export default router;
