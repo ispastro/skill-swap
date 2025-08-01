@@ -1,5 +1,5 @@
-import  prisma  from '../config/db';
-import redis from 'redis';
+import  prisma  from '../config/db.js';
+import redis from '../config/redisClient.js';
 import winston from 'winston';
 import { body, param, validationResult } from 'express-validator';
 
@@ -12,23 +12,20 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-const redisClient = redis.createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
-});
-redisClient.connect().catch((err) => logger.error('Redis connection failed', { error: err.message }));
+
 
 // Validation middleware
-const validateChatInitiation = [
+export const validateChatInitiation = [
   body('recipientId').isUUID().withMessage('Invalid recipient ID'),
 ];
 
-const validateMessage = [
+export const validateMessage = [
   param('chatId').isUUID().withMessage('Invalid chat ID'),
   body('content').isString().trim().notEmpty().withMessage('Message content is required'),
 ];
 
 // Initiate a chat session
-const initiateChat = async (req, res) => {
+export const initiateChat = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -95,7 +92,7 @@ const initiateChat = async (req, res) => {
 };
 
 // Get user's chat sessions
-const getChats = async (req, res) => {
+ export const getChats = async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -118,7 +115,7 @@ const getChats = async (req, res) => {
 };
 
 // Get messages for a chat session
-const getMessages = async (req, res) => {
+export const getMessages = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -139,7 +136,7 @@ const getMessages = async (req, res) => {
     }
 
     // Check Redis cache
-    const cachedMessages = await redisClient.get(`chat:${chatId}:messages`);
+    const cachedMessages = await redis.get(`chat:${chatId}:messages`);
     if (cachedMessages) {
       return res.status(200).json(JSON.parse(cachedMessages));
     }
@@ -154,7 +151,7 @@ const getMessages = async (req, res) => {
     });
 
     // Cache in Redis (expire after 1 hour)
-    await redisClient.set(`chat:${chatId}:messages`, JSON.stringify(messages), { EX: 3600 });
+    await redis.set(`chat:${chatId}:messages`, JSON.stringify(messages), { EX: 3600 });
 
     res.status(200).json(messages);
   } catch (error) {
@@ -164,7 +161,7 @@ const getMessages = async (req, res) => {
 };
 
 // Send a message
-const sendMessage = async (req, res) => {
+export const sendMessage = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -198,7 +195,7 @@ const sendMessage = async (req, res) => {
     });
 
     // Invalidate Redis cache
-    await redisClient.del(`chat:${chatId}:messages`);
+    await redis.del(`chat:${chatId}:messages`);
 
     // Emit WebSocket event to both users
     if (req.io) {
@@ -218,4 +215,4 @@ const sendMessage = async (req, res) => {
   }
 };
 
-module.exports = { initiateChat, getChats, getMessages, sendMessage, validateChatInitiation, validateMessage };
+
