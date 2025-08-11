@@ -1,7 +1,7 @@
-import  prisma  from '../config/db.js';
+import prisma from '../config/db.js';
 import redis from '../config/redisClient.js';
 import winston from 'winston';
-import { body, param, validationResult } from 'express-validator';
+import { body, param, validationResult }  from 'express-validator';
 
 const logger = winston.createLogger({
   level: 'info',
@@ -10,25 +10,44 @@ const logger = winston.createLogger({
     winston.format.json()
   ),
   transports: [new winston.transports.Console()],
-});
-
-
-
+}); 
 // Validation middleware
 export const validateChatInitiation = [
-  body('recipientId').isUUID().withMessage('Invalid recipient ID'),
+body('recipientId').isUUID().withMessage('Invalid recipient ID'),
 ];
-
 export const validateMessage = [
   param('chatId').isUUID().withMessage('Invalid chat ID'),
   body('content').isString().trim().notEmpty().withMessage('Message content is required'),
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      logger.info('Validation errors for', req.method, req.url, ':', errors.array());
+      return res.status(400).json({ message: 'Invalid input', errors: errors.array() });
+    }
+    next();
+  },
 ];
+// create validator that only validated the chatId
+export const validateChatId = [
+  param('chatId').isUUID().withMessage('Invalid chat ID'),
+  (req, res, next) => {
 
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      logger.info('Validation errors for', req.method, req.url, ':', errors.array());
+      return res.status(400).json({ message: 'Invalid input', errors: errors.array() });
+    }
+    next();
+    
+
+  },
+];
 // Initiate a chat session
 export const initiateChat = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      logger.info('Validation errors for initiateChat:', errors.array());
       return res.status(400).json({ message: 'Invalid input', errors: errors.array() });
     }
 
@@ -92,9 +111,10 @@ export const initiateChat = async (req, res) => {
 };
 
 // Get user's chat sessions
- export const getChats = async (req, res) => {
+export const getChats = async (req, res) => {
   try {
     const userId = req.user.id;
+    logger.info('Fetching chats for user', { userId });
 
     const chats = await prisma.chatSession.findMany({
       where: {
@@ -119,11 +139,13 @@ export const getMessages = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      logger.info('Validation errors for getMessages:', errors.array());
       return res.status(400).json({ message: 'Invalid input', errors: errors.array() });
     }
 
     const { chatId } = req.params;
     const userId = req.user.id;
+    logger.info('Fetching messages for chat', { chatId, userId });
 
     // Verify user is part of the chat
     const chat = await prisma.chatSession.findUnique({
@@ -132,13 +154,22 @@ export const getMessages = async (req, res) => {
     });
 
     if (!chat || ![chat.initiatorId, chat.recipientId].includes(userId)) {
+      logger.info('Unauthorized chat access attempt', { chatId, userId });
       return res.status(403).json({ message: 'Unauthorized access to chat' });
     }
 
     // Check Redis cache
     const cachedMessages = await redis.get(`chat:${chatId}:messages`);
-    if (cachedMessages) {
-      return res.status(200).json(JSON.parse(cachedMessages));
+    if (cachedMessages && cachedMessages !== "") {
+      logger.info('Cache hit for messages', { chatId });
+      try {
+        return res.status(200).json(JSON.parse(cachedMessages));
+      } catch (e) {
+        logger.error('Error parsing cached messages', { chatId, error: e.message });
+        // Optionally delete the bad cache so it doesn't break again
+        await redis.del(`chat:${chatId}:messages`);
+        // Continue to fetch from DB below
+      }
     }
 
     // Fetch from database
@@ -152,6 +183,7 @@ export const getMessages = async (req, res) => {
 
     // Cache in Redis (expire after 1 hour)
     await redis.set(`chat:${chatId}:messages`, JSON.stringify(messages), { EX: 3600 });
+    logger.info('Messages fetched and cached', { chatId, messageCount: messages.length });
 
     res.status(200).json(messages);
   } catch (error) {
@@ -160,33 +192,51 @@ export const getMessages = async (req, res) => {
   }
 };
 
-// Send a message
 export const sendMessage = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      logger.info('Validation errors for sendMessage:', errors.array());
       return res.status(400).json({ message: 'Invalid input', errors: errors.array() });
     }
 
     const { chatId } = req.params;
     const { content } = req.body;
     const senderId = req.user.id;
+    logger.info('Sending message', { chatId, senderId });
+
+    // Check for valid chatId
+    if (!chatId) {
+      logger.error('chatId is missing in sendMessage');
+      return res.status(400).json({ message: 'chatId is required' });
+    }
 
     // Verify user is part of the chat
-    const chat = await prisma.chatSession.findUnique({
-      where: { id: chatId },
-      select: { initiatorId: true, recipientId: true },
-    });
+    let chat;
+    try {
+      chat = await prisma.chatSession.findUnique({
+        where: { id: chatId },
+        select: { initiatorId: true, recipientId: true },
+      });
+    } catch (err) {
+      logger.error('Error querying chatSession', { chatId, error: err.message });
+      return res.status(500).json({ message: 'Database error', error: err.message });
+    }
 
     if (!chat || ![chat.initiatorId, chat.recipientId].includes(senderId)) {
+      logger.info('Unauthorized message send attempt', { chatId, senderId });
       return res.status(403).json({ message: 'Unauthorized access to chat' });
     }
+
+    // Determine recipientId
+    const recipientId = chat.initiatorId === senderId ? chat.recipientId : chat.initiatorId;
 
     // Create message
     const message = await prisma.message.create({
       data: {
         chatId,
         senderId,
+        recipientId, // <-- required by your schema
         content,
       },
       include: {
@@ -196,10 +246,10 @@ export const sendMessage = async (req, res) => {
 
     // Invalidate Redis cache
     await redis.del(`chat:${chatId}:messages`);
+    logger.info('Redis cache invalidated', { chatId });
 
     // Emit WebSocket event to both users
     if (req.io) {
-      const recipientId = chat.initiatorId === senderId ? chat.recipientId : chat.initiatorId;
       req.io.to(chatId).emit('newMessage', message);
       req.io.to(recipientId).emit('newMessageNotification', {
         chatId,
@@ -214,5 +264,3 @@ export const sendMessage = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
-
