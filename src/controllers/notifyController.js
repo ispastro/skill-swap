@@ -9,7 +9,16 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-export const notifyNewMatches = async (req, res, next) => {
+// Function to check profile completion
+function checkProfileCompletion(profile) {
+  const missing = [];
+  if (!profile.bio || profile.bio.trim() === '') missing.push('bio');
+  if (!profile.skillsHave || profile.skillsHave.length === 0) missing.push('skillsHave');
+  if (!profile.skillsWant || profile.skillsWant.length === 0) missing.push('skillsWant');
+  return { profileCompleted: missing.length === 0, missing };
+}
+
+export const notifyNewMatches = async (req, res) => {
   try {
     const updatedUser = req.updatedUser;
     if (!updatedUser) {
@@ -21,18 +30,40 @@ export const notifyNewMatches = async (req, res, next) => {
       select: { id: true, username: true, skillsHave: true, skillsWant: true },
     });
 
+    const notificationsSent = [];
     for (const user of users) {
       const matchScore = calculateWeightedMatchScore(updatedUser, user);
-      if (matchScore >= 0.8) {
+      if (matchScore >= 0.8) { // 80% match threshold
         const message = `You have a new match with ${updatedUser.username} (${(matchScore * 100).toFixed(0)}% match)`;
-        req.io.to(user.id).emit('newMatch', { message });
+        await prisma.notification.create({
+          data: {
+            senderId: updatedUser.id,
+            recipientId: user.id,
+            message,
+          },
+        });
+        req.io.to(user.id).emit('notification', {
+          notificationId: `${updatedUser.id}-${user.id}-${Date.now()}`, // Unique ID
+          message,
+          sender: { id: updatedUser.id, username: updatedUser.username },
+        });
+        notificationsSent.push({ recipientId: user.id, message });
         logger.info(`Match notification sent to ${user.id}: ${message}`);
       }
     }
 
-    res.status(200).json(updatedUser);
+    const { profileCompleted, missing } = checkProfileCompletion(updatedUser);
+    const responseMessage = profileCompleted
+      ? "🎉 Profile updated successfully! Matches notified."
+      : "✅ Profile updated, but still incomplete. Matches notified.";
+    res.status(200).json({
+      message: responseMessage,
+      user: updatedUser,
+      profileCompleted,
+      ...(missing.length > 0 && { missing }),
+    });
   } catch (error) {
-    logger.error('Error in notifyNewMatches:', error);
+    logger.error('Error in notifyNewMatches:', { message: error.message, stack: error.stack });
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -80,7 +111,7 @@ export const sendNotification = async (req, res) => {
     logger.info(`Notification sent from ${senderId} to ${recipientId}: ${message}`);
     res.status(201).json(notification);
   } catch (error) {
-    logger.error('Error in sendNotification:', error);
+    logger.error('Error in sendNotification:', { message: error.message, stack: error.stack });
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

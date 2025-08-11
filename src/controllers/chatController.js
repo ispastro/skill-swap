@@ -11,6 +11,7 @@ const logger = winston.createLogger({
   ),
   transports: [new winston.transports.Console()],
 }); 
+
 // Validation middleware
 export const validateChatInitiation = [
 body('recipientId').isUUID().withMessage('Invalid recipient ID'),

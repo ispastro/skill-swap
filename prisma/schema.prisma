@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,45 +8,44 @@ datasource db {
 }
 
 model User {
-  id                String             @id @default(uuid())
-  username          String             @unique @db.VarChar(20) // Unique for mentions, login, etc.
-  email             String             @unique
-  password          String
-  bio               String?            @db.VarChar(255)        // Optional, max size good for UI display
-  skillsHave        String[]           @default([])
-  skillsWant        String[]           @default([])
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-
-  SentProposals     BarterProposal[]   @relation("SentProposals")
-  ReceivedProposals BarterProposal[]   @relation("ReceivedProposals")
-  SentChats         ChatSession[]      @relation("SentChats")
-  ReceivedChats     ChatSession[]      @relation("ReceivedChats")
-  SentMessages      Message[]          @relation("SentMessages")
-  ReceivedMessages  Message[]          @relation("ReceivedMessages")
-  SentNotifications Notification[]     @relation("SentNotifications")
-  ReceivedNotifications Notification[] @relation("ReceivedNotifications")
+  id                    String           @id @default(uuid())
+  username              String           @unique @db.VarChar(20)
+  email                 String           @unique
+  password              String
+  bio                   String?          @db.VarChar(255)
+  skillsHave            String[]         @default([])
+  skillsWant            String[]         @default([])
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  SentProposals         BarterProposal[] @relation("SentProposals")
+  ReceivedProposals     BarterProposal[] @relation("ReceivedProposals")
+  SentChats             ChatSession[]    @relation("SentChats")
+  ReceivedChats         ChatSession[]    @relation("ReceivedChats")
+  ReceivedMessages      Message[]        @relation("ReceivedMessages")
+  SentMessages          Message[]        @relation("SentMessages")
+  ReceivedNotifications Notification[]   @relation("ReceivedNotifications")
+  SentNotifications     Notification[]   @relation("SentNotifications")
 }
 
 model BarterProposal {
-  id           String         @id @default(uuid())
-  fromUser     User           @relation("SentProposals", fields: [fromUserId], references: [id])
-  fromUserId   String
-  toUser       User           @relation("ReceivedProposals", fields: [toUserId], references: [id])
-  toUserId     String
-  offer        String         @db.VarChar(255) // Describe what the user offers
-  request      String         @db.VarChar(255) // Describe what the user wants in return
-  status       ProposalStatus @default(pending)
-  createdAt    DateTime       @default(now())
+  id         String         @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  offer      String         @db.VarChar(255)
+  request    String         @db.VarChar(255)
+  status     ProposalStatus @default(pending)
+  createdAt  DateTime       @default(now())
+  fromUser   User           @relation("SentProposals", fields: [fromUserId], references: [id])
+  toUser     User           @relation("ReceivedProposals", fields: [toUserId], references: [id])
 }
 
 model ChatSession {
-  id          String      @id @default(uuid())
+  id          String    @id @default(uuid())
   initiatorId String
   recipientId String
-  createdAt   DateTime    @default(now())
-  initiator   User        @relation("SentChats", fields: [initiatorId], references: [id])
-  recipient   User        @relation("ReceivedChats", fields: [recipientId], references: [id])
+  createdAt   DateTime  @default(now())
+  initiator   User      @relation("SentChats", fields: [initiatorId], references: [id])
+  recipient   User      @relation("ReceivedChats", fields: [recipientId], references: [id])
   messages    Message[]
 }
 
@@ -60,14 +53,13 @@ model Message {
   id          String      @id @default(uuid())
   chatId      String
   senderId    String
-  recipientId String                         
+  recipientId String
   content     String      @db.VarChar(1000)
   createdAt   DateTime    @default(now())
   chat        ChatSession @relation(fields: [chatId], references: [id])
-  sender      User        @relation("SentMessages", fields: [senderId], references: [id])
   recipient   User        @relation("ReceivedMessages", fields: [recipientId], references: [id])
+  sender      User        @relation("SentMessages", fields: [senderId], references: [id])
 }
-
 
 model Notification {
   id          String   @id @default(uuid())
@@ -75,8 +67,8 @@ model Notification {
   recipientId String
   message     String   @db.VarChar(255)
   createdAt   DateTime @default(now())
-  sender      User     @relation("SentNotifications", fields: [senderId], references: [id], map: "notification_sender_fkey")
   recipient   User     @relation("ReceivedNotifications", fields: [recipientId], references: [id], map: "notification_recipient_fkey")
+  sender      User     @relation("SentNotifications", fields: [senderId], references: [id], map: "notification_sender_fkey")
 }
 
 enum ProposalStatus {
