@@ -1,108 +1,92 @@
+// findSkillMatches.js
+
 import prisma from '../config/db.js';
-import { suggestSkills } from '../utils/suggestSkills.js';
-import Fuse from 'fuse.js';
+import redis from '../config/redisClient.js'; // your provided Redis instance
+import fuzzysort from 'fuzzysort';
 
-export function normalizeSkills(skills) {
-  if (!skills || !Array.isArray(skills)) return [];
-  return skills.map(skill =>
-    skill.toLowerCase().trim().replace(/[^a-z0-9+\-# ]/gi, '')
-  );
+// Configurable constants
+const PAGE_SIZE = 500; // number of users fetched per DB query
+const CACHE_TTL = 60 * 5; // 5 minutes cache
+const MIN_SCORE = -5000; // fuzzy score threshold
+
+/**
+ * Normalize skills for better matching.
+ */
+function normalizeSkill(skill) {
+  return skill.trim().toLowerCase();
 }
 
-export function fuzzyMatch(skillsA, skillsB) {
-  const fuse = new Fuse(skillsB, {
-    threshold: 0.4, // adjust for strictness
-    includeScore: true,
-    keys: [],
-  });
-
-  return skillsA.flatMap(skill => {
-    const result = fuse.search(skill);
-    if (result.length > 0) {
-      return result[0].item;
-    }
-    return [];
-  });
-}
-
-export function calculateWeightedMatchScore(userA, userB) {
-  const skillsTheyHave = normalizeSkills(userB.skillsHave);
-  const skillsTheyWant = normalizeSkills(userB.skillsWant);
-  const skillsIHave = normalizeSkills(userA.skillsHave);
-  const skillsIWant = normalizeSkills(userA.skillsWant);
-
-  const matchedHave = fuzzyMatch(skillsIWant, skillsTheyHave); // what I want, they have
-  const matchedWant = fuzzyMatch(skillsIHave, skillsTheyWant); // what they want, I have
-
-  // Weighting: mutual match = more valuable
-  const weightedScore = matchedHave.length * 2 + matchedWant.length * 2;
-
-  return {
-    matchScore: weightedScore,
-    matchedHave,
-    matchedWant
-  };
-}
-
-export function getConfidenceLabel(score) {
-  if (score >= 8) return '🔥 Strong Match';
-  if (score >= 4) return '👌 Medium Match';
-  return '🙂 Light Match';
-}
-
-export const findSkillsMatches = async (req, res) => {
-  try {
-    const currentUser = await prisma.user.findUnique({
-      where: { id: req.user.id },
-    });
-
-    if (!currentUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const allUsers = await prisma.user.findMany({
-      where: {
-        id: { not: currentUser.id },
-      },
-      select: {
-        id: true,
-        username: true,
-        bio: true,
-        skillsHave: true,
-        skillsWant: true,
-      },
-    });
-
-    const matches = allUsers.map(user => {
-      const { matchScore, matchedHave, matchedWant } = calculateWeightedMatchScore(currentUser, user);
-      return {
-        user,
-        matchScore,
-        matchedHave,
-        matchedWant,
-        matchConfidence: getConfidenceLabel(matchScore),
-      };
-    })
-      .filter(match => match.matchScore > 0)
-      .sort((a, b) => b.matchScore - a.matchScore);
-
-    const aiSuggestions = suggestSkills(currentUser.skillsHave);
-
-    res.status(200).json({
-      message: matches.length > 0 ? "✅ Matches found!" : "❌ No mutual matches yet",
-      totalMatches: matches.length,
-      suggestions: aiSuggestions,
-      matches: matches.map(({ user, matchScore, matchedHave, matchedWant, matchConfidence }) => ({
-        ...user,
-        matchScore,
-        matchedHave,
-        matchedWant,
-        matchConfidence
-      }))
-    });
-
-  } catch (error) {
-    console.error("❌ Matchmaking error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+/**
+ * Get skill matches for a given user.
+ * @param {string} currentUserId - The ID of the user to match.
+ * @returns {Promise<Array>} - List of matches with score.
+ */
+export async function findSkillMatches(currentUserId) {
+  const cacheKey = `matches:${currentUserId}`;
+  
+  // Try cache first
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    console.log('Cache hit');
+    return cached;
   }
-};
+
+  // Fetch current user
+  const currentUser = await prisma.user.findUnique({
+    where: { id: currentUserId },
+    select: { id: true, skills: true },
+  });
+
+  if (!currentUser || !currentUser.skills?.length) {
+    return [];
+  }
+
+  const normalizedSkills = currentUser.skills.map(normalizeSkill);
+  let matches = [];
+
+  let page = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const users = await prisma.user.findMany({
+      skip: page * PAGE_SIZE,
+      take: PAGE_SIZE,
+      where: {
+        id: { not: currentUserId },
+        skills: { hasSome: currentUser.skills }, // DB-side pre-filter
+      },
+      select: { id: true, name: true, skills: true },
+    });
+
+    if (users.length === 0) {
+      hasMore = false;
+      break;
+    }
+
+    // Score matches
+    for (const user of users) {
+      const score = fuzzysort.single(
+        normalizedSkills.join(' '),
+        user.skills.map(normalizeSkill).join(' ')
+      )?.score ?? -Infinity;
+
+      if (score >= MIN_SCORE) {
+        matches.push({
+          id: user.id,
+          name: user.name,
+          score,
+        });
+      }
+    }
+
+    page++;
+  }
+
+  // Sort by score desc
+  matches.sort((a, b) => b.score - a.score);
+
+  // Cache results
+  await redis.set(cacheKey, matches, { ex: CACHE_TTL });
+
+  return matches;
+}
