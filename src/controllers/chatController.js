@@ -10,12 +10,13 @@ const logger = winston.createLogger({
     winston.format.json()
   ),
   transports: [new winston.transports.Console()],
-}); 
+});
 
 // Validation middleware
 export const validateChatInitiation = [
-body('recipientId').isUUID().withMessage('Invalid recipient ID'),
+  body('recipientId').isUUID().withMessage('Invalid recipient ID'),
 ];
+
 export const validateMessage = [
   param('chatId').isUUID().withMessage('Invalid chat ID'),
   body('content').isString().trim().notEmpty().withMessage('Message content is required'),
@@ -28,21 +29,20 @@ export const validateMessage = [
     next();
   },
 ];
+
 // create validator that only validated the chatId
 export const validateChatId = [
   param('chatId').isUUID().withMessage('Invalid chat ID'),
   (req, res, next) => {
-
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       logger.info('Validation errors for', req.method, req.url, ':', errors.array());
       return res.status(400).json({ message: 'Invalid input', errors: errors.array() });
     }
     next();
-    
-
   },
 ];
+
 // Initiate a chat session
 export const initiateChat = async (req, res) => {
   try {
@@ -135,7 +135,8 @@ export const getChats = async (req, res) => {
   }
 };
 
-// Get messages for a chat session
+
+// Get messages for a chat session (with pagination and efficient cache)
 export const getMessages = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -146,7 +147,11 @@ export const getMessages = async (req, res) => {
 
     const { chatId } = req.params;
     const userId = req.user.id;
-    logger.info('Fetching messages for chat', { chatId, userId });
+    // Pagination params
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = Math.min(parseInt(req.query.pageSize) || 20, 100); // max 100 per page
+    const offset = (page - 1) * pageSize;
+    logger.info('Fetching messages for chat', { chatId, userId, page, pageSize });
 
     // Verify user is part of the chat
     const chat = await prisma.chatSession.findUnique({
@@ -154,37 +159,40 @@ export const getMessages = async (req, res) => {
       select: { initiatorId: true, recipientId: true },
     });
 
+
+    
     if (!chat || ![chat.initiatorId, chat.recipientId].includes(userId)) {
       logger.info('Unauthorized chat access attempt', { chatId, userId });
       return res.status(403).json({ message: 'Unauthorized access to chat' });
     }
 
-    // Check Redis cache
-    const cachedMessages = await redis.get(`chat:${chatId}:messages`);
+    // Redis cache key for this page
+    const cacheKey = `chat:${chatId}:messages:page:${page}:size:${pageSize}`;
+    const cachedMessages = await redis.get(cacheKey);
     if (cachedMessages && cachedMessages !== "") {
-      logger.info('Cache hit for messages', { chatId });
+      logger.info('Cache hit for messages', { chatId, page, pageSize });
       try {
         return res.status(200).json(JSON.parse(cachedMessages));
       } catch (e) {
         logger.error('Error parsing cached messages', { chatId, error: e.message });
-        // Optionally delete the bad cache so it doesn't break again
-        await redis.del(`chat:${chatId}:messages`);
-        // Continue to fetch from DB below
+        await redis.del(cacheKey);
       }
     }
 
-    // Fetch from database
+    // Fetch from database with pagination and index usage
     const messages = await prisma.message.findMany({
       where: { chatId },
       include: {
         sender: { select: { username: true } },
       },
       orderBy: { createdAt: 'asc' },
+      skip: offset,
+      take: pageSize,
     });
 
-    // Cache in Redis (expire after 1 hour)
-    await redis.set(`chat:${chatId}:messages`, JSON.stringify(messages), { EX: 3600 });
-    logger.info('Messages fetched and cached', { chatId, messageCount: messages.length });
+    // Cache this page in Redis (expire after 1 hour)
+    await redis.set(cacheKey, JSON.stringify(messages), { EX: 3600 });
+    logger.info('Messages fetched and cached', { chatId, messageCount: messages.length, page, pageSize });
 
     res.status(200).json(messages);
   } catch (error) {
@@ -206,23 +214,11 @@ export const sendMessage = async (req, res) => {
     const senderId = req.user.id;
     logger.info('Sending message', { chatId, senderId });
 
-    // Check for valid chatId
-    if (!chatId) {
-      logger.error('chatId is missing in sendMessage');
-      return res.status(400).json({ message: 'chatId is required' });
-    }
-
     // Verify user is part of the chat
-    let chat;
-    try {
-      chat = await prisma.chatSession.findUnique({
-        where: { id: chatId },
-        select: { initiatorId: true, recipientId: true },
-      });
-    } catch (err) {
-      logger.error('Error querying chatSession', { chatId, error: err.message });
-      return res.status(500).json({ message: 'Database error', error: err.message });
-    }
+    const chat = await prisma.chatSession.findUnique({
+      where: { id: chatId },
+      select: { initiatorId: true, recipientId: true },
+    });
 
     if (!chat || ![chat.initiatorId, chat.recipientId].includes(senderId)) {
       logger.info('Unauthorized message send attempt', { chatId, senderId });
@@ -237,7 +233,7 @@ export const sendMessage = async (req, res) => {
       data: {
         chatId,
         senderId,
-        recipientId, // <-- required by your schema
+        recipientId,
         content,
       },
       include: {
@@ -245,9 +241,20 @@ export const sendMessage = async (req, res) => {
       },
     });
 
-    // Invalidate Redis cache
-    await redis.del(`chat:${chatId}:messages`);
-    logger.info('Redis cache invalidated', { chatId });
+    // Invalidate all paginated Redis cache for this chat
+    const pattern = `chat:${chatId}:messages:page:*`;
+    if (typeof redis.keys === 'function') {
+      // If using ioredis or node-redis with .keys support
+      const keys = await redis.keys(pattern);
+      if (Array.isArray(keys) && keys.length > 0) {
+        await redis.del(...keys);
+        logger.info('Redis paginated cache invalidated', { chatId, keys });
+      }
+    } else {
+      // Fallback: delete first page cache only
+      await redis.del(`chat:${chatId}:messages:page:1:size:20`);
+      logger.info('Redis cache invalidated (fallback)', { chatId });
+    }
 
     // Emit WebSocket event to both users
     if (req.io) {
