@@ -10,9 +10,11 @@ import profileRoutes from './routes/profileRoutes.js';
 import matchRoutes from './routes/matchRoutes.js';
 import barterRoutes from './routes/barterRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import googleAuthRoutes from './routes/googleAuthRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import { notifyNewMatches } from './controllers/notifyController.js';
 import authMiddleware from './middleware/authMiddleware.js';
+import passport from 'passport';
 
 // Load environment variables
 dotenv.config();
@@ -27,7 +29,8 @@ const io = new Server(httpServer, {
 // Middleware
 app.use(cors({ origin: '*' }));
 app.use(express.json());
-
+app.use(passport.initialize());
+//app.use(passport.session());
 // Attach io to requests for WebSocket events
 app.use((req, res, next) => {
   req.io = io;
@@ -41,6 +44,7 @@ app.use('/api/match', authMiddleware, matchRoutes);
 app.use('/api/barter', authMiddleware, barterRoutes);
 app.use('/api/chats', authMiddleware, chatRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
+app.use('/auth', googleAuthRoutes);
 
 
 
