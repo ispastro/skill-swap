@@ -2,20 +2,12 @@ import prisma from '../config/db.js';
 import { checkProfileCompletion } from '../utils/profileUtils.js';
 import { notifyNewMatches } from '../controllers/notifyController.js';
 
-
-
-
-
 /**
  * Get the authenticated user's profile.
  */
 
-
 export const getUserProfile = async (req, res) => {
   const userId = req.user?.id;
-
-
-
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
