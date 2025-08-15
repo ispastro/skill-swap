@@ -25,6 +25,12 @@ model User {
   SentMessages          Message[]        @relation("SentMessages")
   ReceivedNotifications Notification[]   @relation("ReceivedNotifications")
   SentNotifications     Notification[]   @relation("SentNotifications")
+  ReviewsGiven     Review[] @relation("ReviewsGiven")
+  ReviewsReceived  Review[] @relation("ReviewsReceived")
+  userAExchanges   SkillExchange[] @relation("UserAExchanges")
+  userBExchanges   SkillExchange[] @relation("UserBExchanges")
+
+  files              File[]
 }
 
 model BarterProposal {
@@ -70,6 +76,68 @@ model Notification {
   recipient   User     @relation("ReceivedNotifications", fields: [recipientId], references: [id], map: "notification_recipient_fkey")
   sender      User     @relation("SentNotifications", fields: [senderId], references: [id], map: "notification_sender_fkey")
 }
+
+model Review {
+  id          String   @id @default(uuid())
+  reviewerId  String
+  revieweeId  String
+  exchangeId  String
+  rating      Int      // 1-5 stars
+  comment     String?  @db.VarChar(1000)
+  tags        String[]
+  createdAt   DateTime @default(now())
+  reviewer    User     @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  reviewee    User     @relation("ReviewsReceived", fields: [revieweeId], references: [id])
+  exchange    SkillExchange @relation(fields: [exchangeId], references: [id])
+
+  // Optionally, link to a BarterProposal or ChatSession if you want to tie reviews to a specific transaction
+  // barterId   String?
+  // barter     BarterProposal? @relation(fields: [barterId], references: [id])
+}
+
+
+model File {
+  id           Int      @id @default(autoincrement())
+  filename     String
+  originalName String
+  path         String
+  mimetype     String
+  size         Int
+  uploaderId   String
+  uploadedAt   DateTime @default(now())
+  uploader     User     @relation(fields: [uploaderId], references: [id])
+  chatId       String?  // Optional: link to chat message/session
+}
+
+
+
+model SkillExchange {
+  id              String          @id @default(cuid())
+  userAId         String
+  userBId         String
+  skillA          String
+  skillB          String
+  status          ExchangeStatus  @default(PENDING)
+  userACompleted  Boolean         @default(false)
+  userBCompleted  Boolean         @default(false)
+  completedAt     DateTime?
+  reviews         Review[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  userA           User            @relation("UserAExchanges", fields: [userAId], references: [id])
+  userB           User            @relation("UserBExchanges", fields: [userBId], references: [id])
+}
+
+
+
+enum ExchangeStatus {
+  PENDING
+  COMPLETION_REQUESTED
+  COMPLETED
+  DISPUTED
+}
+
 
 enum ProposalStatus {
   pending
