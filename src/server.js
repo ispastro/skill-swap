@@ -15,6 +15,8 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import { notifyNewMatches } from './controllers/notifyController.js';
 import authMiddleware from './middleware/authMiddleware.js';
 import passport from 'passport';
+import reviewRoutes from './routes/reviewRoutes.js'; // Import review routes
+import fileRoutes from './routes/fileRoutes.js'; // Import file sharing routes
 
 // Load environment variables
 dotenv.config();
@@ -28,7 +30,8 @@ const io = new Server(httpServer, {
 
 // Middleware
 app.use(cors({ origin: '*' }));
-app.use(express.json());
+app.use(express.json( { limit: '50mb' })); // Increased limit for file uploads
+app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Increased limit for file uploads
 app.use(passport.initialize());
 //app.use(passport.session());
 // Attach io to requests for WebSocket events
@@ -45,8 +48,10 @@ app.use('/api/barter', authMiddleware, barterRoutes);
 app.use('/api/chats', authMiddleware, chatRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
 app.use('/auth', googleAuthRoutes);
+app.use('/api/reviews', authMiddleware, reviewRoutes);
 
-
+// File sharing routes
+app.use('/api/files', authMiddleware, fileRoutes);
 
 // Root health check route
 app.get('/', (req, res) => {
