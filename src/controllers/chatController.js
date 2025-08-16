@@ -1,3 +1,4 @@
+
 import prisma from '../config/db.js';
 import redis from '../config/redisClient.js';
 import winston from 'winston';
@@ -271,4 +272,26 @@ export const sendMessage = async (req, res) => {
     logger.error('Send message error', { error: error.message, chatId: req.params.chatId });
     res.status(500).json({ message: 'Server error', error: error.message });
   }
+
+
 };
+// Get existing chat session between two users (for matches page button logic)
+export const getChatSession = async (req, res) => {
+  try {
+    const { userA, userB } = req.query;
+    if (!userA || !userB) return res.status(400).json({ chatId: null });
+
+    const session = await prisma.chatSession.findFirst({
+      where: {
+        OR: [
+          { initiatorId: userA, recipientId: userB },
+          { initiatorId: userB, recipientId: userA }
+        ]
+      }
+    });
+    res.json({ chatId: session ? session.id : null });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
