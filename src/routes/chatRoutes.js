@@ -7,6 +7,7 @@ import  {
   validateChatId,
   validateChatInitiation,
   validateMessage,
+  getChatSession
  } from '../controllers/chatController.js';
 import authMiddleware from '../middleware/authMiddleware.js'; 
 
@@ -16,6 +17,7 @@ router.post('/', validateChatInitiation, authMiddleware, initiateChat);
 router.get('/:userId', authMiddleware, getChats);
 router.get('/:chatId/messages', authMiddleware, validateChatId, getMessages);
 router.post('/:chatId/messages', authMiddleware, validateMessage, sendMessage);
+router.get('/session', authMiddleware, getChatSession);
 export default router;
 
 
