@@ -1,8 +1,29 @@
 
+
 import prisma from '../config/db.js';
 import redis from '../config/redisClient.js';
 import winston from 'winston';
 import { body, param, validationResult }  from 'express-validator';
+
+// --- SOCKET.IO JOIN/EMIT LOGIC (for robust notifications) ---
+// This should be placed in your main server.js/socket setup, but for clarity, here is the join handler:
+//
+// io.on('connection', (socket) => {
+//   const userId = socket.handshake.query.userId;
+//   if (userId) {
+//     socket.join(userId);
+//     console.log(`Socket ${socket.id} joined user room ${userId}`);
+//   }
+//   socket.on('join', (id) => {
+//     socket.join(id);
+//     console.log(`Socket ${socket.id} joined room ${id}`);
+//   });
+//   socket.on('disconnect', () => {
+//     console.log(`Socket ${socket.id} disconnected`);
+//   });
+// });
+//
+// Make sure this logic is in your server.js/socket setup.
 
 const logger = winston.createLogger({
   level: 'info',
@@ -96,12 +117,14 @@ export const initiateChat = async (req, res) => {
       },
     });
 
-    // Emit WebSocket notification to recipient
+
+    // Emit WebSocket notification to recipient (with logging)
     if (req.io) {
       req.io.to(recipientId).emit('chatInitiated', {
         chatId: chatSession.id,
         initiator: { id: initiatorId, username: chatSession.initiator.username },
       });
+      logger.info('Emitted chatInitiated event', { to: recipientId, chatId: chatSession.id });
     }
 
     logger.info('Chat initiated', { chatId: chatSession.id, initiatorId, recipientId });
@@ -289,7 +312,7 @@ export const getChatSession = async (req, res) => {
         ]
       }
     });
-    res.json({ chatId: session ? session.id : null });
+   return  res.status(200).json({ chatId: session ? session.id : null });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
