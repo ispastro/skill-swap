@@ -1,4 +1,6 @@
 
+
+import prisma from  '../config/db.js'
 // Create a review for a completed SkillExchange
 export const createReview = async (req, res) => {
     try {
