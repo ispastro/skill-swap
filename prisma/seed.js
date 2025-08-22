@@ -7,6 +7,7 @@ async function main() {
   await prisma.message.deleteMany();
   await prisma.chatSession.deleteMany();
   await prisma.barterProposal.deleteMany();
+  await prisma.file.deleteMany(); // Delete files before users to avoid FK constraint
   await prisma.user.deleteMany();
 
   // Seed users
@@ -14,10 +15,9 @@ async function main() {
     data: {
       id: 'f61c62d3-a9a2-412a-9448-62567ef1adf5', // Match initiatorId
       name: "alice",
+      username: "alice",
       email: "a@example.com",
       password: "myPlainPassword123",
-
- // In production, hash with bcrypt
       skillsHave: ['JavaScript', 'React'],
       skillsWant: ['Python', 'Django'],
       bio: 'Frontend developer looking to learn backend',
@@ -28,6 +28,7 @@ async function main() {
     data: {
       id: 'f61c62d3-a9a2-412a-9448-62567ef1adf6', // Match recipientId
       name: 'bob',
+      username: 'bob',
       email: 'bob@example.com',
       password: 'hashed_password',
       skillsHave: ['Python', 'Django'],
@@ -35,6 +36,24 @@ async function main() {
       bio: 'Backend developer interested in frontend',
     },
   });
+
+
+
+// ...existing user creation code...
+
+// Seed a SkillExchange
+const exchange = await prisma.skillExchange.create({
+  data: {
+    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    userAId: user1.id,
+    userBId: user2.id,
+    status: 'COMPLETED',
+    skillA: 'JavaScript', // required by your schema
+    skillB: 'Python',     // required by your schema
+    // add other required fields if needed
+  },
+});
+console.log('Seeded SkillExchange:', exchange);
 
   // Seed a chat session
   const chat = await prisma.chatSession.create({
@@ -44,10 +63,10 @@ async function main() {
     },
   });
 
-  // Seed a message
+  // Seed a message (ensure correct chatId field name)
   await prisma.message.create({
     data: {
-      chatId: chat.id,
+      chatId: chat.id, // If your schema uses chatSessionId, change this to chatSessionId: chat.id
       senderId: user1.id,
       content: 'Hey Bob, want to swap JavaScript for Python skills?',
     },
@@ -62,9 +81,5 @@ async function main() {
     },
   });
 
-  console.log('Seeded:', { user1, user2, chat });
+  console.log('Seeded:', { user1, user2, exchange, chat });
 }
-
-main()
-  .catch((e) => console.error('Seed error:', e))
-  .finally(async () => await prisma.$disconnect());

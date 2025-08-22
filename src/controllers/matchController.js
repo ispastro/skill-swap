@@ -71,6 +71,10 @@ function cosineSimilarity(vecA, vecB) {
   return normA && normB ? dot / (Math.sqrt(normA) * Math.sqrt(normB)) : 0;
 }
 
+
+
+
+
 // --- Dynamic Synonym Generation ---
 async function generateDynamicSynonyms() {
   const cacheKey = 'dynamicSynonyms';
@@ -91,6 +95,8 @@ async function generateDynamicSynonyms() {
     }
   }
 
+
+  
   // Generate new synonyms
   const skills = await prisma.user.findMany({
     select: { skillsHave: true, skillsWant: true },
