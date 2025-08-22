@@ -21,7 +21,23 @@ async function fetchSkillEmbedding(skill) {
       headers: { 'Authorization': `Bearer ${process.env.HF_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ inputs: cleaned })
     });
-    const data = await response.json();
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(`[Match] Embedding API error for "${skill}": Status ${response.status} - ${text}`);
+      return null;
+    }
+    let data;
+    try {
+      data = await response.json();
+    } catch (err) {
+      const text = await response.text();
+      console.error(`[Match] Embedding API JSON parse error for "${skill}": ${err}. Response: ${text}`);
+      return null;
+    }
+    if (!data.embedding) {
+      console.error(`[Match] Embedding API response missing 'embedding' for "${skill}":`, data);
+      return null;
+    }
     const elapsed = Date.now() - start;
     if (elapsed > 2000) console.warn(`[Match] Slow embedding fetch for "${cleaned}" (${elapsed}ms)`);
 
@@ -52,8 +68,23 @@ function cosineSimilarity(vecA, vecB) {
 async function generateDynamicSynonyms() {
   const cacheKey = 'dynamicSynonyms';
   const cached = await redis.get(cacheKey);
-  if (cached) return JSON.parse(cached);
+  if (cached) {
+    try {
+      const parsedCache = JSON.parse(cached);
+      if (parsedCache && typeof parsedCache === 'object') {
+        console.log('[Match] Synonym cache hit');
+        return parsedCache;
+      } else {
+        console.warn(`[Match] Invalid synonym cache format for ${cacheKey}, clearing cache`);
+        await redis.del(cacheKey);
+      }
+    } catch (parseError) {
+      console.error(`[Match] Invalid JSON in synonym cache for ${cacheKey}: ${cached}`, parseError);
+      await redis.del(cacheKey);
+    }
+  }
 
+  // Generate new synonyms
   const skills = await prisma.user.findMany({
     select: { skillsHave: true, skillsWant: true },
   }).then(users => [...new Set(users.flatMap(u => [...u.skillsHave, ...u.skillsWant]))]);
@@ -76,48 +107,37 @@ async function generateDynamicSynonyms() {
     }
   }
 
-  await redis.set(cacheKey, JSON.stringify(synonymMap), { EX: 86400 });
+  await redis.set(cacheKey, JSON.stringify(synonymMap), { EX: 86400 }); // Ensure stringification
+  console.log('[Match] Synonym map generated and cached');
   return synonymMap;
 }
 
 // --- Hugging Face Skill Verification ---
 async function verifySkillWithHF(skill, bio) {
   try {
-    const response = await fetch(
-      'https://api-inference.huggingface.co/models/facebook/bart-large-mnli',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.HF_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: bio,
-          parameters: { candidate_labels: [skill] },
-          options: { wait_for_model: true },
-        }),
-      }
-    );
-
+    const response = await fetch('https://api-inference.huggingface.co/models/facebook/bart-large-mnli', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.HF_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: bio,
+        parameters: { candidate_labels: [skill] },
+        options: { wait_for_model: true }
+      })
+    });
     const data = await response.json();
-
-    if (data && data.labels && data.scores) {
-      const skillIndex = data.labels.findIndex(
-        label => label.toLowerCase() === skill.toLowerCase()
-      );
-      if (skillIndex >= 0) {
-        const confidence = data.scores[skillIndex];
-        return { verified: confidence > 0.7, confidence };
-      }
+    if (data && data.scores && data.scores.length > 0) {
+      const confidence = data.scores[0];
+      return { verified: confidence > 0.7, confidence };
     }
-
     throw new Error('Invalid response format');
   } catch (err) {
     console.error('[Match] HF verification error:', err);
-    return { verified: false, confidence: 0.0 };
+    return { verified: false, confidence: 0.5 };
   }
 }
-
 
 function extractYearsOfExperience(bio) {
   if (!bio || typeof bio !== 'string') return 0;
@@ -127,11 +147,11 @@ function extractYearsOfExperience(bio) {
 
 export function normalizeSkills(skills) {
   if (!skills || !Array.isArray(skills)) return [];
-  return skills.map(async skill => {
+  return Promise.all(skills.map(async skill => {
     const synonymMap = await generateDynamicSynonyms();
     const cleaned = skill.toLowerCase().trim().replace(/[^a-z0-9+\-# ]/gi, '');
     return synonymMap[cleaned] || cleaned;
-  });
+  }));
 }
 
 export function fuzzyMatch(skillsA, skillsB) {
@@ -166,10 +186,12 @@ export async function semanticMatch(skillsA, skillsB) {
 }
 
 export async function calculateWeightedMatchScore(userA, userB) {
-  const skillsTheyHave = await Promise.all(normalizeSkills(userB.skillsHave));
-  const skillsTheyWant = await Promise.all(normalizeSkills(userB.skillsWant));
-  const skillsIHave = await Promise.all(normalizeSkills(userA.skillsHave));
-  const skillsIWant = await Promise.all(normalizeSkills(userA.skillsWant));
+  const [skillsTheyHave, skillsTheyWant, skillsIHave, skillsIWant] = await Promise.all([
+    normalizeSkills(userB.skillsHave),
+    normalizeSkills(userB.skillsWant),
+    normalizeSkills(userA.skillsHave),
+    normalizeSkills(userA.skillsWant),
+  ]);
 
   const matchedHave = fuzzyMatch(skillsIWant, skillsTheyHave);
   const matchedWant = fuzzyMatch(skillsIHave, skillsTheyWant);
@@ -197,7 +219,7 @@ export async function calculateWeightedMatchScore(userA, userB) {
       verifySkillWithHF(skill, userB.bio)
     ));
     const avgConfidence = verifications.reduce((sum, v) => sum + v.confidence, 0) / verifications.length;
-    verificationBoost = Math.min(avgConfidence * 0.2, 0.2); // Max 20% boost
+    verificationBoost = Math.min(avgConfidence * 0.2, 0.2);
   }
 
   // Hybrid score: 60% fuzzy + 25% semantic + 10% experience + 5% verification
@@ -268,7 +290,7 @@ export const findSkillsMatches = async (req, res) => {
       const batchMatches = await Promise.all(
         users.map(async (user) => {
           const result = await calculateWeightedMatchScore(currentUser, user);
-          if (result.matchScore > 30) {
+          if (result.matchScore > 0) {
             return {
               ...user,
               ...result,
