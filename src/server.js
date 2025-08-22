@@ -48,7 +48,7 @@ app.use('/api/barter', authMiddleware, barterRoutes);
 app.use('/api/chats', authMiddleware, chatRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
 app.use('/auth', googleAuthRoutes);
-app.use('/api/reviews', authMiddleware, reviewRoutes);
+app.use('/api/reviews',  reviewRoutes);
 
 // File sharing routes
 app.use('/api/files', authMiddleware, fileRoutes);
@@ -60,15 +60,25 @@ app.get('/', (req, res) => {
 
 // WebSocket setup
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  socket.on('join', (userId) => {
+  // Auto-join user room on connect if userId is in handshake query
+  const userId = socket.handshake.query.userId;
+  if (userId) {
     socket.join(userId);
-    console.log(`User ${userId} joined room`);
+    console.log(`Socket ${socket.id} auto-joined user room ${userId} on connect`);
+  }
+
+  // Allow explicit join (for legacy or fallback)
+  socket.on('join', (id) => {
+    socket.join(id);
+    console.log(`Socket ${socket.id} joined room ${id}`);
   });
+
+  // Join chat room for group chat/message delivery
   socket.on('joinChat', (chatId) => {
     socket.join(chatId);
-    console.log(`User joined chat room: ${chatId}`);
+    console.log(`Socket ${socket.id} joined chat room: ${chatId}`);
   });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
