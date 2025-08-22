@@ -8,7 +8,10 @@ import redis from '../config/redisClient.js';
 // --- Embedding-based Skill Normalization ---
 const skillEmbeddingCache = {};
 
+
 // Fetch embedding from Hugging Face Inference API with caching and fallback
+
+
 async function fetchSkillEmbedding(skill) {
   const cleaned = skill.toLowerCase().trim().replace(/[^a-z0-9+\-# ]/gi, '');
   const cached = skillEmbeddingCache[cleaned];
@@ -51,6 +54,10 @@ async function fetchSkillEmbedding(skill) {
     return null;
   }
 }
+
+
+
+
 
 // Cosine similarity between two embedding vectors
 function cosineSimilarity(vecA, vecB) {
