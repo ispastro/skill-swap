@@ -1,6 +1,6 @@
-import express from 'express';
-import request from 'supertest';
-import { findSkillsMatches, verifySkill, normalizeSkills, fuzzyMatch, semanticMatch, calculateWeightedMatchScore, fetchSkillEmbedding, cosineSimilarity, generateDynamicSynonyms, verifySkillWithHF, extractYearsOfExperience, getConfidenceLabel } from './matchController.js';
+const  express = require('express');
+const request = require('supertest');
+const { findSkillsMatches, verifySkill, normalizeSkills, fuzzyMatch, semanticMatch, calculateWeightedMatchScore, fetchSkillEmbedding, cosineSimilarity, generateDynamicSynonyms, verifySkillWithHF, extractYearsOfExperience, getConfidenceLabel } =require('../controllers/matchController.js');
 
 // Mock dependencies
 jest.mock('../config/db.js', () => ({
