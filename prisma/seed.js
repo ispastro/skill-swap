@@ -14,8 +14,7 @@ async function main() {
   const user1 = await prisma.user.create({
     data: {
       id: 'f61c62d3-a9a2-412a-9448-62567ef1adf5', // Match initiatorId
-      name: "alice",
-      username: "alice",
+  name: "alice",
       email: "a@example.com",
       password: "myPlainPassword123",
       skillsHave: ['JavaScript', 'React'],
@@ -27,8 +26,7 @@ async function main() {
   const user2 = await prisma.user.create({
     data: {
       id: 'f61c62d3-a9a2-412a-9448-62567ef1adf6', // Match recipientId
-      name: 'bob',
-      username: 'bob',
+  name: 'bob',
       email: 'bob@example.com',
       password: 'hashed_password',
       skillsHave: ['Python', 'Django'],

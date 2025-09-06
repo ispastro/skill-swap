@@ -84,7 +84,7 @@ export const initiateChat = async (req, res) => {
     // Check if recipient exists
     const recipient = await prisma.user.findUnique({
       where: { id: recipientId },
-      select: { id: true, username: true },
+      select: { id: true, name: true },
     });
 
     if (!recipient) {
@@ -112,8 +112,8 @@ export const initiateChat = async (req, res) => {
         recipientId,
       },
       include: {
-        initiator: { select: { username: true } },
-        recipient: { select: { username: true } },
+        initiator: { select: { name: true } },
+        recipient: { select: { name: true } },
       },
     });
 
@@ -122,7 +122,7 @@ export const initiateChat = async (req, res) => {
     if (req.io) {
       req.io.to(recipientId).emit('chatInitiated', {
         chatId: chatSession.id,
-        initiator: { id: initiatorId, username: chatSession.initiator.username },
+        initiator: { id: initiatorId, name: chatSession.initiator.name },
       });
       logger.info('Emitted chatInitiated event', { to: recipientId, chatId: chatSession.id });
     }
@@ -146,8 +146,8 @@ export const getChats = async (req, res) => {
         OR: [{ initiatorId: userId }, { recipientId: userId }],
       },
       include: {
-        initiator: { select: { id: true, username: true } },
-        recipient: { select: { id: true, username: true } },
+  initiator: { select: { id: true, name: true } },
+  recipient: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -207,7 +207,7 @@ export const getMessages = async (req, res) => {
     const messages = await prisma.message.findMany({
       where: { chatId },
       include: {
-        sender: { select: { username: true } },
+  sender: { select: { name: true } },
       },
       orderBy: { createdAt: 'asc' },
       skip: offset,
@@ -261,7 +261,7 @@ export const sendMessage = async (req, res) => {
         content,
       },
       include: {
-        sender: { select: { username: true } },
+  sender: { select: { name: true } },
       },
     });
 

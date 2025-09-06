@@ -13,7 +13,7 @@ async (accessToken, refreshToken, profile, done) => {
   if (!user) {
     user = await prisma.user.create({
       data: {
-        username: profile.displayName,
+        name: profile.displayName,
         email: profile.emails[0].value,
         password: '', // Google users don't need a password
       }

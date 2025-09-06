@@ -27,14 +27,14 @@ export const notifyNewMatches = async (req, res) => {
 
     const users = await prisma.user.findMany({
       where: { id: { not: updatedUser.id } },
-      select: { id: true, username: true, skillsHave: true, skillsWant: true },
+      select: { id: true, name: true, skillsHave: true, skillsWant: true },
     });
 
     const notificationsSent = [];
     for (const user of users) {
       const matchScore = calculateWeightedMatchScore(updatedUser, user);
       if (matchScore >= 0.8) { // 80% match threshold
-        const message = `You have a new match with ${updatedUser.username} (${(matchScore * 100).toFixed(0)}% match)`;
+  const message = `You have a new match with ${updatedUser.name} (${(matchScore * 100).toFixed(0)}% match)`;
         await prisma.notification.create({
           data: {
             senderId: updatedUser.id,
@@ -45,7 +45,7 @@ export const notifyNewMatches = async (req, res) => {
         req.io.to(user.id).emit('notification', {
           notificationId: `${updatedUser.id}-${user.id}-${Date.now()}`, // Unique ID
           message,
-          sender: { id: updatedUser.id, username: updatedUser.username },
+          sender: { id: updatedUser.id, name: updatedUser.name },
         });
         notificationsSent.push({ recipientId: user.id, message });
         logger.info(`Match notification sent to ${user.id}: ${message}`);
@@ -97,8 +97,8 @@ export const sendNotification = async (req, res) => {
         id: true,
         message: true,
         createdAt: true,
-        sender: { select: { id: true, username: true } },
-        recipient: { select: { id: true, username: true } },
+  sender: { select: { id: true, name: true } },
+  recipient: { select: { id: true, name: true } },
       },
     });
 

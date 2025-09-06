@@ -10,19 +10,19 @@ async function removeDuplicates() {
   let renameCount = 1;
 
   for (const user of users) {
-    if (seen.has(user.username)) {
-      const newUsername = `${user.username}_${renameCount++}`;
+    if (seen.has(user.name)) {
+      const newName = `${user.name}_${renameCount++}`;
       await prisma.user.update({
         where: { id: user.id },
-        data: { username: newUsername },
+        data: { name: newName },
       });
-      console.log(`Renamed duplicate ${user.username} → ${newUsername}`);
+      console.log(`Renamed duplicate ${user.name} → ${newName}`);
     } else {
-      seen.add(user.username);
+      seen.add(user.name);
     }
   }
 
-  console.log("✅ Duplicate usernames fixed.");
+  console.log("✅ Duplicate names fixed.");
 }
 
 removeDuplicates()

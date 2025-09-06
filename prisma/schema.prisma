@@ -29,12 +29,14 @@ datasource db {
 
 model User {
   id                    String           @id @default(uuid())
-  username              String           @unique @db.VarChar(20)
+  name                  String           @db.VarChar(20) @map("username")
   email                 String           @unique
   password              String
   bio                   String?          @db.VarChar(255)
   skillsHave            String[]         @default([])
   skillsWant            String[]         @default([])
+  normalizedSkillsHave  String[]         @default([])
+  normalizedSkillsWant  String[]         @default([])
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
   SentProposals         BarterProposal[] @relation("SentProposals")

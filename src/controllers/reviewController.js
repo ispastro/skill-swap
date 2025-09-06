@@ -61,7 +61,7 @@ export const getUserReviews = async (req, res) => {
         const reviews = await prisma.review.findMany({
             where: { reviewedId: userId },
             include: {
-                reviewer: { select: { id: true, username: true } },
+                reviewer: { select: { id: true, name: true } },
                 exchange: true,
             },
             orderBy: { createdAt: 'desc' }
@@ -79,7 +79,7 @@ export const getReviewsGiven = async (req, res) => {
         const reviews = await prisma.review.findMany({
             where: { reviewerId: userId },
             include: {
-                reviewed: { select: { id: true, username: true } },
+                reviewed: { select: { id: true, name: true } },
                 exchange: true,
             },
             orderBy: { createdAt: 'desc' }

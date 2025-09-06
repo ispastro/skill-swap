@@ -12,7 +12,8 @@ export const getUserProfile = async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        username: true,
+        id: true,
+        name: true,
         email: true,
         bio: true,
         skillsHave: true,
@@ -32,7 +33,8 @@ export const getUserProfile = async (req, res) => {
         message: "📝 Your profile is incomplete. Please update it to unlock full features.",
         missing,
         user: {
-          username: user.username,
+          id: user.id,
+          name: user.name,
           email: user.email,
         },
         profileCompleted: false,
@@ -70,7 +72,7 @@ export const updateUserProfile = async (req, res, next) => {
       },
       select: {
         id: true,
-        username: true,
+        name: true,
         email: true,
         bio: true,
         skillsHave: true,

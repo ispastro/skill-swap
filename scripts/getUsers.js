@@ -4,11 +4,11 @@ import prisma from '../src/config/db.js';
 const getUsers = async () => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, username: true },
+      select: { id: true, name: true },
     });
     console.log('Available Users:\n');
     users.forEach((user) => {
-      console.log(`ID: ${user.id}, Username: ${user.username}`);
+  console.log(`ID: ${user.id}, Name: ${user.name}`);
     });
     process.exit(0);
   } catch (error) {
