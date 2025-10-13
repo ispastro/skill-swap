@@ -39,8 +39,8 @@ async function batchFetchEmbeddings(skills) {
   });
 
   if (toFetch.length > 0) {
-    // Batch into groups of 50 to avoid HF limits
-    const batchSize = 50;
+    // Batch conservatively to avoid HF limits/timeouts
+    const batchSize = 16;
     for (let i = 0; i < toFetch.length; i += batchSize) {
       const batch = toFetch.slice(i, i + batchSize);
       try {
@@ -49,15 +49,14 @@ async function batchFetchEmbeddings(skills) {
         const response = await fetch('https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${process.env.HF_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ inputs: batch })
+          body: JSON.stringify({ inputs: batch, options: { wait_for_model: true, use_cache: true } })
         });
         if (!response.ok) {
-          if (response.status === 404) {
-            console.error('[Match] Embedding model endpoint returned 404. Disabling embeddings for this run.');
-            embeddingsDisabled = true;
-            return cleanedSkills.map(() => null);
-          }
-            throw new Error(`Status ${response.status}`);
+          const bodyText = await response.text().catch(() => '');
+          console.error(`[Match] Embedding model HTTP ${response.status}: ${bodyText}`);
+          // Disable embeddings for this run on any non-OK to avoid loops
+          embeddingsDisabled = true;
+          return cleanedSkills.map(() => null);
         }
         const data = await response.json();
         if (!Array.isArray(data) || data.length !== batch.length) throw new Error('Invalid batch response');
@@ -76,6 +75,8 @@ async function batchFetchEmbeddings(skills) {
         console.log(`[Match] Batched ${batch.length} embeddings (${Date.now() - start}ms)`);
       } catch (err) {
         console.error(`[Match] Batch embedding error:`, err);
+        embeddingsDisabled = true;
+        return cleanedSkills.map(() => null);
       }
     }
   }
