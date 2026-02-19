@@ -80,10 +80,8 @@ export const updateUserProfile = async (req, res, next) => {
       },
     });
 
-    const { profileCompleted, missing } = checkProfileCompletion(updatedUser);
-
-    req.updatedUser = updatedUser; // Pass updated user to notifyNewMatches
-    next(); // Proceed to notifyNewMatches
+    req.updatedUser = updatedUser;
+    next();
   } catch (error) {
     console.error("❌ Error in updateUserProfile:", error.message);
     res.status(500).json({ message: "Server error", error: error.message });
