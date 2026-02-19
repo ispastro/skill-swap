@@ -4,13 +4,13 @@ import prisma from  '../config/db.js'
 // Create a review for a completed SkillExchange
 export const createReview = async (req, res) => {
     try {
-        const { exchangeId, reviewedId, rating, feedback, tags } = req.body;
+        const { exchangeId, revieweeId, rating, feedback, tags } = req.body;
         const reviewerId = req.user.id;
 
-        if (!exchangeId || !reviewedId || !rating) {
-            return res.status(400).json({ message: "exchangeId, reviewedId, and rating are required." });
+        if (!exchangeId || !revieweeId || !rating) {
+            return res.status(400).json({ message: "exchangeId, revieweeId, and rating are required." });
         }
-        if (reviewerId === reviewedId) {
+        if (reviewerId === revieweeId) {
             return res.status(400).json({ message: "You cannot review yourself." });
         }
 
@@ -23,13 +23,13 @@ export const createReview = async (req, res) => {
             return res.status(400).json({ message: "Exchange must be COMPLETED to review." });
         }
         if (![exchange.userAId, exchange.userBId].includes(reviewerId) ||
-                ![exchange.userAId, exchange.userBId].includes(reviewedId)) {
+                ![exchange.userAId, exchange.userBId].includes(revieweeId)) {
             return res.status(403).json({ message: "You are not a participant in this exchange." });
         }
 
         // Prevent duplicate review for this exchange/reviewer/reviewed
         const existing = await prisma.review.findFirst({
-            where: { exchangeId, reviewerId, reviewedId }
+            where: { exchangeId, reviewerId, revieweeId }
         });
         if (existing) {
             return res.status(400).json({ message: "You have already reviewed this user for this exchange." });
@@ -40,9 +40,9 @@ export const createReview = async (req, res) => {
             data: {
                 exchangeId,
                 reviewerId,
-                reviewedId,
+                revieweeId,
                 rating,
-                feedback,
+                comment: feedback,
                 tags,
             }
         });
@@ -59,7 +59,7 @@ export const getUserReviews = async (req, res) => {
     try {
         const { userId } = req.params;
         const reviews = await prisma.review.findMany({
-            where: { reviewedId: userId },
+            where: { revieweeId: userId },
             include: {
                 reviewer: { select: { id: true, name: true } },
                 exchange: true,
@@ -79,7 +79,7 @@ export const getReviewsGiven = async (req, res) => {
         const reviews = await prisma.review.findMany({
             where: { reviewerId: userId },
             include: {
-                reviewed: { select: { id: true, name: true } },
+                reviewee: { select: { id: true, name: true } },
                 exchange: true,
             },
             orderBy: { createdAt: 'desc' }
@@ -95,7 +95,7 @@ export const getUserAverageRating = async (req, res) => {
     try {
         const { userId } = req.params;
         const result = await prisma.review.aggregate({
-            where: { reviewedId: userId },
+            where: { revieweeId: userId },
             _avg: { rating: true },
             _count: { rating: true }
         });

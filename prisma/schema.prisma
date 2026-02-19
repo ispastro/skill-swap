@@ -39,8 +39,7 @@ model User {
   normalizedSkillsWant  String[]         @default([])
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
-  SentProposals         BarterProposal[] @relation("SentProposals")
-  ReceivedProposals     BarterProposal[] @relation("ReceivedProposals")
+
   SentChats             ChatSession[]    @relation("SentChats")
   ReceivedChats         ChatSession[]    @relation("ReceivedChats")
   ReceivedMessages      Message[]        @relation("ReceivedMessages")
@@ -54,18 +53,6 @@ model User {
 
   files              File[]
   skillVerifications SkillVerification[]
-}
-
-model BarterProposal {
-  id         String         @id @default(uuid())
-  fromUserId String
-  toUserId   String
-  offer      String         @db.VarChar(255)
-  request    String         @db.VarChar(255)
-  status     ProposalStatus @default(pending)
-  createdAt  DateTime       @default(now())
-  fromUser   User           @relation("SentProposals", fields: [fromUserId], references: [id])
-  toUser     User           @relation("ReceivedProposals", fields: [toUserId], references: [id])
 }
 
 model ChatSession {
@@ -162,8 +149,3 @@ enum ExchangeStatus {
 }
 
 
-enum ProposalStatus {
-  pending
-  accepted
-  declined
-}

@@ -8,7 +8,7 @@ import redis from './config/redisClient.js'; // Ensure this is correctly set up
 import authRoutes from './routes/authRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import matchRoutes from './routes/matchRoutes.js';
-import barterRoutes from './routes/barterRoutes.js';
+
 import chatRoutes from './routes/chatRoutes.js';
 import googleAuthRoutes from './routes/googleAuthRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
@@ -44,7 +44,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', authMiddleware, profileRoutes);
 app.use('/api/match', authMiddleware, matchRoutes);
-app.use('/api/barter', authMiddleware, barterRoutes);
+
 app.use('/api/chats', authMiddleware, chatRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
 app.use('/auth', googleAuthRoutes);
