@@ -1,12 +1,10 @@
+import { Request, Response, NextFunction } from 'express';
+// @ts-ignore
 import prisma from '../config/db.js';
+// @ts-ignore
 import { checkProfileCompletion } from '../utils/profileUtils.js';
-import { notifyNewMatches } from '../controllers/notifyController.js';
 
-/**
- * Get the authenticated user's profile.
- */
-
-export const getUserProfile = async (req, res) => {
+export const getUserProfile = async (req: Request, res: Response): Promise<Response> => {
   const userId = req.user?.id;
   try {
     const user = await prisma.user.findUnique({
@@ -24,7 +22,6 @@ export const getUserProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "🚫 User not found" });
     }
-
 
     const { profileCompleted, missing } = checkProfileCompletion(user);
 
@@ -47,19 +44,16 @@ export const getUserProfile = async (req, res) => {
       profileCompleted: true,
     });
   } catch (error) {
-    console.error("❌ Error in getUserProfile:", error.message);
+    console.error("❌ Error in getUserProfile:", error instanceof Error ? error.message : error);
     return res.status(500).json({
       message: "💥 Server error. Please try again later.",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      error: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined,
     });
   }
 };
 
-/**
- * Update the authenticated user's profile and notify matches.
- */
-export const updateUserProfile = async (req, res, next) => {
-  const userId = req.user.id;
+export const updateUserProfile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const userId = req.user!.id;
   const { bio, skillsHave, skillsWant } = req.body;
 
   try {
@@ -83,7 +77,7 @@ export const updateUserProfile = async (req, res, next) => {
     req.updatedUser = updatedUser;
     next();
   } catch (error) {
-    console.error("❌ Error in updateUserProfile:", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("❌ Error in updateUserProfile:", error instanceof Error ? error.message : error);
+    res.status(500).json({ message: "Server error", error: error instanceof Error ? error.message : 'Unknown error' });
   }
 };

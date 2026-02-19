@@ -1,11 +1,11 @@
+import { Request, Response } from 'express';
+// @ts-ignore
+import prisma from '../config/db.js';
 
-
-import prisma from  '../config/db.js'
-// Create a review for a completed SkillExchange
-export const createReview = async (req, res) => {
+export const createReview = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { exchangeId, revieweeId, rating, feedback, tags } = req.body;
-        const reviewerId = req.user.id;
+        const reviewerId = req.user!.id;
 
         if (!exchangeId || !revieweeId || !rating) {
             return res.status(400).json({ message: "exchangeId, revieweeId, and rating are required." });
@@ -14,7 +14,6 @@ export const createReview = async (req, res) => {
             return res.status(400).json({ message: "You cannot review yourself." });
         }
 
-        // Check exchange exists and is completed, and user is a participant
         const exchange = await prisma.skillExchange.findUnique({ where: { id: exchangeId } });
         if (!exchange) {
             return res.status(404).json({ message: "SkillExchange not found." });
@@ -27,7 +26,6 @@ export const createReview = async (req, res) => {
             return res.status(403).json({ message: "You are not a participant in this exchange." });
         }
 
-        // Prevent duplicate review for this exchange/reviewer/reviewed
         const existing = await prisma.review.findFirst({
             where: { exchangeId, reviewerId, revieweeId }
         });
@@ -35,7 +33,6 @@ export const createReview = async (req, res) => {
             return res.status(400).json({ message: "You have already reviewed this user for this exchange." });
         }
 
-        // Create review
         const review = await prisma.review.create({
             data: {
                 exchangeId,
@@ -47,15 +44,14 @@ export const createReview = async (req, res) => {
             }
         });
 
-        res.status(201).json({ message: "Review created successfully", review });
+        return res.status(201).json({ message: "Review created successfully", review });
     } catch (error) {
         console.error("Review creation error:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
+        return res.status(500).json({ message: "Server error", error: error instanceof Error ? error.message : 'Unknown error' });
     }
 };
 
-// Get all reviews for a user (as reviewed)
-export const getUserReviews = async (req, res) => {
+export const getUserReviews = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { userId } = req.params;
         const reviews = await prisma.review.findMany({
@@ -66,14 +62,13 @@ export const getUserReviews = async (req, res) => {
             },
             orderBy: { createdAt: 'desc' }
         });
-        res.status(200).json({ reviews });
+        return res.status(200).json({ reviews });
     } catch (error) {
-        res.status(500).json({ message: "Server error", error: error.message });
+        return res.status(500).json({ message: "Server error", error: error instanceof Error ? error.message : 'Unknown error' });
     }
 };
 
-// Get all reviews given by a user (as reviewer)
-export const getReviewsGiven = async (req, res) => {
+export const getReviewsGiven = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { userId } = req.params;
         const reviews = await prisma.review.findMany({
@@ -84,14 +79,13 @@ export const getReviewsGiven = async (req, res) => {
             },
             orderBy: { createdAt: 'desc' }
         });
-        res.json({ reviews });
+        return res.json({ reviews });
     } catch (error) {
-        res.status(500).json({ message: "Server error", error: error.message });
+        return res.status(500).json({ message: "Server error", error: error instanceof Error ? error.message : 'Unknown error' });
     }
 };
 
-// Get average rating for a user
-export const getUserAverageRating = async (req, res) => {
+export const getUserAverageRating = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { userId } = req.params;
         const result = await prisma.review.aggregate({
@@ -99,8 +93,8 @@ export const getUserAverageRating = async (req, res) => {
             _avg: { rating: true },
             _count: { rating: true }
         });
-        res.json({ averageRating: result._avg.rating, reviewCount: result._count.rating });
+        return res.json({ averageRating: result._avg.rating, reviewCount: result._count.rating });
     } catch (error) {
-        res.status(500).json({ message: "Server error", error: error.message });
+        return res.status(500).json({ message: "Server error", error: error instanceof Error ? error.message : 'Unknown error' });
     }
 };
