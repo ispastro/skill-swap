@@ -23,8 +23,9 @@ enum VerificationStatus {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -60,9 +61,13 @@ model ChatSession {
   initiatorId String
   recipientId String
   createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   initiator   User      @relation("SentChats", fields: [initiatorId], references: [id])
   recipient   User      @relation("ReceivedChats", fields: [recipientId], references: [id])
   messages    Message[]
+
+  @@index([initiatorId])
+  @@index([recipientId])
 }
 
 model Message {
@@ -72,9 +77,15 @@ model Message {
   recipientId String
   content     String      @db.VarChar(1000)
   createdAt   DateTime    @default(now())
+  readAt      DateTime?
   chat        ChatSession @relation(fields: [chatId], references: [id])
   recipient   User        @relation("ReceivedMessages", fields: [recipientId], references: [id])
   sender      User        @relation("SentMessages", fields: [senderId], references: [id])
+
+  @@index([chatId, createdAt])
+  @@index([chatId])
+  @@index([senderId])
+  @@index([recipientId])
 }
 
 model Notification {
@@ -107,7 +118,7 @@ model Review {
 
 
 model File {
-  id           Int      @id @default(autoincrement())
+  id           String   @id @default(uuid())
   filename     String
   originalName String
   path         String
@@ -117,6 +128,8 @@ model File {
   uploadedAt   DateTime @default(now())
   uploader     User     @relation(fields: [uploaderId], references: [id])
   chatId       String?  // Optional: link to chat message/session
+
+  @@index([uploaderId])
 }
 
 

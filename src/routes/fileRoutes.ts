@@ -1,8 +1,8 @@
-import express from 'express';
+import express, { Router } from 'express';
 import { logFileMetadata, listFiles, downloadFile, deleteFile } from '../controllers/fileController.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Log file metadata after frontend upload
 router.post('/upload', authMiddleware, logFileMetadata);

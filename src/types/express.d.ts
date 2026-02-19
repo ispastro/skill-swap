@@ -1,17 +1,19 @@
-import { Request } from 'express';
+import { Server } from 'socket.io';
+import { User as PrismaUser } from '@prisma/client';
 
 declare global {
   namespace Express {
+    interface User {
+      id: string;
+      iat?: number;
+      exp?: number;
+    }
+
     interface Request {
-      user?: {
-        id: string;
-        iat?: number;
-        exp?: number;
-      };
-      io?: any; // Socket.IO instance (will type properly later)
-      updatedUser?: any; // For profile update flow (will type properly later)
+      io?: Server;
+      updatedUser?: Pick<PrismaUser, 'id' | 'name' | 'bio' | 'skillsHave' | 'skillsWant'>;
     }
   }
 }
 
-export {};
+export { };

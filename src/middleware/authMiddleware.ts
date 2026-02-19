@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const authMiddleware = async (
+const authMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction
-): Promise<void | Response> => {
+): void | Response => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

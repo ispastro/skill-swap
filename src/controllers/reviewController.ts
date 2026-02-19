@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-// @ts-ignore
 import prisma from '../config/db.js';
 
 export const createReview = async (req: Request, res: Response): Promise<Response> => {
@@ -7,9 +6,6 @@ export const createReview = async (req: Request, res: Response): Promise<Respons
         const { exchangeId, revieweeId, rating, feedback, tags } = req.body;
         const reviewerId = req.user!.id;
 
-        if (!exchangeId || !revieweeId || !rating) {
-            return res.status(400).json({ message: "exchangeId, revieweeId, and rating are required." });
-        }
         if (reviewerId === revieweeId) {
             return res.status(400).json({ message: "You cannot review yourself." });
         }
@@ -22,7 +18,7 @@ export const createReview = async (req: Request, res: Response): Promise<Respons
             return res.status(400).json({ message: "Exchange must be COMPLETED to review." });
         }
         if (![exchange.userAId, exchange.userBId].includes(reviewerId) ||
-                ![exchange.userAId, exchange.userBId].includes(revieweeId)) {
+            ![exchange.userAId, exchange.userBId].includes(revieweeId)) {
             return res.status(403).json({ message: "You are not a participant in this exchange." });
         }
 
@@ -53,7 +49,7 @@ export const createReview = async (req: Request, res: Response): Promise<Respons
 
 export const getUserReviews = async (req: Request, res: Response): Promise<Response> => {
     try {
-        const { userId } = req.params;
+        const userId = req.params.userId as string;
         const reviews = await prisma.review.findMany({
             where: { revieweeId: userId },
             include: {
@@ -70,7 +66,7 @@ export const getUserReviews = async (req: Request, res: Response): Promise<Respo
 
 export const getReviewsGiven = async (req: Request, res: Response): Promise<Response> => {
     try {
-        const { userId } = req.params;
+        const userId = req.params.userId as string;
         const reviews = await prisma.review.findMany({
             where: { reviewerId: userId },
             include: {
@@ -87,13 +83,13 @@ export const getReviewsGiven = async (req: Request, res: Response): Promise<Resp
 
 export const getUserAverageRating = async (req: Request, res: Response): Promise<Response> => {
     try {
-        const { userId } = req.params;
+        const userId = req.params.userId as string;
         const result = await prisma.review.aggregate({
             where: { revieweeId: userId },
             _avg: { rating: true },
             _count: { rating: true }
         });
-        return res.json({ averageRating: result._avg.rating, reviewCount: result._count.rating });
+        return res.json({ averageRating: result._avg?.rating ?? null, reviewCount: result._count?.rating ?? 0 });
     } catch (error) {
         return res.status(500).json({ message: "Server error", error: error instanceof Error ? error.message : 'Unknown error' });
     }
