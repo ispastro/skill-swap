@@ -42,6 +42,7 @@
     "@supabase/supabase-js": "^2.55.0",
     "@upstash/redis": "^1.35.2",
     "bcrypt": "^6.0.0",
+    "cohere-ai": "^7.20.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",

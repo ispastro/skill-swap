@@ -4,7 +4,11 @@ import redis from '../config/redisClient.js';
 import { normalizeSkillName, normalizeSkillList } from '../utils/skillTaxonomy.js';
 import { suggestSkills } from '../utils/suggestSkills.js';
 import { findSimilarSkills, ensureSkillEmbeddings } from '../services/embeddingService.js';
+import { isMatchingServiceAvailable, findMatchesFromService, storeEmbeddings } from '../services/matchingClient.js';
 import Fuse from 'fuse.js';
+
+// Feature flag: Use Python matching service if available
+const USE_PYTHON_SERVICE = process.env.USE_PYTHON_MATCHING === 'true';
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -173,6 +177,44 @@ export const findSkillsMatches = async (req: Request, res: Response): Promise<Re
         });
         if (!currentUser) return res.status(404).json({ message: 'User not found' });
 
+        // Try Python matching service first (if enabled and available)
+        if (USE_PYTHON_SERVICE && await isMatchingServiceAvailable()) {
+            console.log('[Match] Using Python matching service');
+            const pythonMatches = await findMatchesFromService(
+                currentUser.id,
+                currentUser.skillsHave,
+                currentUser.skillsWant
+            );
+
+            if (pythonMatches) {
+                // Transform Python response to match current format
+                const matches = pythonMatches.matches.map(m => ({
+                    id: m.user_id,
+                    name: '', // Will be fetched from DB if needed
+                    bio: null,
+                    skillsHave: [],
+                    skillsWant: [],
+                    matchScore: m.match_score,
+                    matchedHave: m.matched_have,
+                    matchedWant: m.matched_want,
+                    semanticMatches: m.semantic_matches,
+                    matchConfidence: m.confidence,
+                }));
+
+                const response = {
+                    message: matches.length > 0 ? 'Matches found!' : 'No mutual matches yet',
+                    totalMatches: pythonMatches.total,
+                    suggestions: suggestSkills(currentUser.skillsHave),
+                    matches,
+                    source: 'python-service',
+                };
+
+                return res.status(200).json(response);
+            }
+
+            console.warn('[Match] Python service failed, falling back to local matching');
+        }
+
         // Check cache
         const cacheKey = `matches:${currentUser.id}`;
         const cached = await redis.get(cacheKey);
@@ -186,11 +228,19 @@ export const findSkillsMatches = async (req: Request, res: Response): Promise<Re
             await redis.del(cacheKey);
         }
 
-        // Ensure embeddings exist for current user's skills (fire-and-forget for new skills)
+        // Ensure embeddings exist for current user's skills
         const allUserSkills = [...currentUser.skillsHave, ...currentUser.skillsWant];
-        ensureSkillEmbeddings(allUserSkills).catch(err =>
-            console.error('[Match] Background embedding error:', err)
-        );
+        if (USE_PYTHON_SERVICE && await isMatchingServiceAvailable()) {
+            // Use Python service for embeddings
+            storeEmbeddings(allUserSkills).catch(err =>
+                console.error('[Match] Python embedding error:', err)
+            );
+        } else {
+            // Use local embedding service
+            ensureSkillEmbeddings(allUserSkills).catch(err =>
+                console.error('[Match] Background embedding error:', err)
+            );
+        }
 
         // Normalize current user's skills
         const normalizedWant = currentUser.normalizedSkillsWant.length > 0
@@ -271,6 +321,7 @@ export const findSkillsMatches = async (req: Request, res: Response): Promise<Re
             totalMatches: allMatches.length,
             suggestions: aiSuggestions,
             matches: allMatches,
+            source: 'local-nodejs',
         };
 
         await redis.set(cacheKey, JSON.stringify(response), { ex: 1800 }); // 30-min cache
