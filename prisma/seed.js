@@ -6,8 +6,7 @@ async function main() {
   await prisma.notification.deleteMany();
   await prisma.message.deleteMany();
   await prisma.chatSession.deleteMany();
-  await prisma.barterProposal.deleteMany();
-  await prisma.file.deleteMany(); // Delete files before users to avoid FK constraint
+  await prisma.file.deleteMany();
   await prisma.user.deleteMany();
 
   // Seed users

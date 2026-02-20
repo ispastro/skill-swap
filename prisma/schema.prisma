@@ -23,8 +23,9 @@ enum VerificationStatus {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -39,8 +40,7 @@ model User {
   normalizedSkillsWant  String[]         @default([])
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
-  SentProposals         BarterProposal[] @relation("SentProposals")
-  ReceivedProposals     BarterProposal[] @relation("ReceivedProposals")
+
   SentChats             ChatSession[]    @relation("SentChats")
   ReceivedChats         ChatSession[]    @relation("ReceivedChats")
   ReceivedMessages      Message[]        @relation("ReceivedMessages")
@@ -56,26 +56,18 @@ model User {
   skillVerifications SkillVerification[]
 }
 
-model BarterProposal {
-  id         String         @id @default(uuid())
-  fromUserId String
-  toUserId   String
-  offer      String         @db.VarChar(255)
-  request    String         @db.VarChar(255)
-  status     ProposalStatus @default(pending)
-  createdAt  DateTime       @default(now())
-  fromUser   User           @relation("SentProposals", fields: [fromUserId], references: [id])
-  toUser     User           @relation("ReceivedProposals", fields: [toUserId], references: [id])
-}
-
 model ChatSession {
   id          String    @id @default(uuid())
   initiatorId String
   recipientId String
   createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   initiator   User      @relation("SentChats", fields: [initiatorId], references: [id])
   recipient   User      @relation("ReceivedChats", fields: [recipientId], references: [id])
   messages    Message[]
+
+  @@index([initiatorId])
+  @@index([recipientId])
 }
 
 model Message {
@@ -85,9 +77,15 @@ model Message {
   recipientId String
   content     String      @db.VarChar(1000)
   createdAt   DateTime    @default(now())
+  readAt      DateTime?
   chat        ChatSession @relation(fields: [chatId], references: [id])
   recipient   User        @relation("ReceivedMessages", fields: [recipientId], references: [id])
   sender      User        @relation("SentMessages", fields: [senderId], references: [id])
+
+  @@index([chatId, createdAt])
+  @@index([chatId])
+  @@index([senderId])
+  @@index([recipientId])
 }
 
 model Notification {
@@ -120,7 +118,7 @@ model Review {
 
 
 model File {
-  id           Int      @id @default(autoincrement())
+  id           String   @id @default(uuid())
   filename     String
   originalName String
   path         String
@@ -130,6 +128,8 @@ model File {
   uploadedAt   DateTime @default(now())
   uploader     User     @relation(fields: [uploaderId], references: [id])
   chatId       String?  // Optional: link to chat message/session
+
+  @@index([uploaderId])
 }
 
 
@@ -162,8 +162,3 @@ enum ExchangeStatus {
 }
 
 
-enum ProposalStatus {
-  pending
-  accepted
-  declined
-}
