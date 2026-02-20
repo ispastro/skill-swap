@@ -7,6 +7,7 @@ import {
   getUserAverageRating
 } from '../controllers/reviewController.js';
 import { createReviewValidator, getUserReviewsValidator } from '../validators/reviewValidators.js';
+// @ts-ignore
 import { validateResult } from '../middleware/validateRequest.js';
 import { reviewLimiter } from '../middleware/rateLimiter.js';
 
