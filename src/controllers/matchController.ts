@@ -4,11 +4,12 @@ import redis from '../config/redisClient.js';
 import { normalizeSkillName, normalizeSkillList } from '../utils/skillTaxonomy.js';
 import { suggestSkills } from '../utils/suggestSkills.js';
 import { findSimilarSkills, ensureSkillEmbeddings } from '../services/embeddingService.js';
-import { isMatchingServiceAvailable, findMatchesFromService, storeEmbeddings } from '../services/matchingClient.js';
+import { storeEmbeddings } from '../services/matchingClient.js';
+import { getPythonMatches, isPythonServiceHealthy } from '../services/pythonMatchService.js';
 import Fuse from 'fuse.js';
 
 // Feature flag: Use Python matching service if available
-const USE_PYTHON_SERVICE = process.env.USE_PYTHON_MATCHING === 'true';
+const USE_PYTHON_SERVICE = process.env.USE_PYTHON_MATCHING !== 'false';
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -177,46 +178,31 @@ export const findSkillsMatches = async (req: Request, res: Response): Promise<Re
         });
         if (!currentUser) return res.status(404).json({ message: 'User not found' });
 
-        // Try Python matching service first (if enabled and available)
-        if (USE_PYTHON_SERVICE && await isMatchingServiceAvailable()) {
-            console.log('[Match] Using Python matching service');
-            const pythonMatches = await findMatchesFromService(
-                currentUser.id,
-                currentUser.skillsHave,
-                currentUser.skillsWant
-            );
+        const cacheKey = `matches:${currentUser.id}`;
 
-            if (pythonMatches) {
-                // Transform Python response to match current format
-                const matches = pythonMatches.matches.map(m => ({
-                    id: m.user_id,
-                    name: '', // Will be fetched from DB if needed
-                    bio: null,
-                    skillsHave: [],
-                    skillsWant: [],
-                    matchScore: m.match_score,
-                    matchedHave: m.matched_have,
-                    matchedWant: m.matched_want,
-                    semanticMatches: m.semantic_matches,
-                    matchConfidence: m.confidence,
-                }));
+        // Try Python matching service first (if enabled and available)
+        if (USE_PYTHON_SERVICE && await isPythonServiceHealthy()) {
+            try {
+                console.log('[Match] Using Python matching service');
+                const pythonResult = await getPythonMatches(currentUser.id);
 
                 const response = {
-                    message: matches.length > 0 ? 'Matches found!' : 'No mutual matches yet',
-                    totalMatches: pythonMatches.total,
+                    message: pythonResult.message || (pythonResult.matches.length > 0 ? 'Matches found!' : 'No mutual matches yet'),
+                    totalMatches: pythonResult.totalMatches,
                     suggestions: suggestSkills(currentUser.skillsHave),
-                    matches,
+                    matches: pythonResult.matches,
                     source: 'python-service',
                 };
 
+                // Cache Python results
+                await redis.set(cacheKey, JSON.stringify(response), { ex: 1800 });
                 return res.status(200).json(response);
+            } catch (error) {
+                console.warn('[Match] Python service failed, falling back to local matching:', error);
             }
-
-            console.warn('[Match] Python service failed, falling back to local matching');
         }
 
         // Check cache
-        const cacheKey = `matches:${currentUser.id}`;
         const cached = await redis.get(cacheKey);
         if (cached) {
             try {
@@ -230,7 +216,7 @@ export const findSkillsMatches = async (req: Request, res: Response): Promise<Re
 
         // Ensure embeddings exist for current user's skills
         const allUserSkills = [...currentUser.skillsHave, ...currentUser.skillsWant];
-        if (USE_PYTHON_SERVICE && await isMatchingServiceAvailable()) {
+        if (USE_PYTHON_SERVICE && await isPythonServiceHealthy()) {
             // Use Python service for embeddings
             storeEmbeddings(allUserSkills).catch(err =>
                 console.error('[Match] Python embedding error:', err)
