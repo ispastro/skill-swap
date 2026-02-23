@@ -1,0 +1,45 @@
+config:
+  target: "http://localhost:8000"
+  phases:
+    # Ultra-light test for low RAM (5.6GB)
+    - duration: 15
+      arrivalRate: 1
+      name: "Warm up - 1 user/sec"
+    - duration: 20
+      arrivalRate: 3
+      name: "Light load - 3 users/sec"
+    - duration: 15
+      arrivalRate: 1
+      name: "Cool down"
+
+scenarios:
+  - name: "Quick API Test"
+    flow:
+      # Register with unique UUID-based email
+      - post:
+          url: "/api/auth/register"
+          headers:
+            x-test-mode: "true"
+          json:
+            name: "user{{ $randomString() }}"
+            email: "test-{{ $randomString() }}@loadtest.com"
+            password: "Test123!@#"
+          capture:
+            - json: "$.token"
+              as: "token"
+
+      # Get Profile
+      - get:
+          url: "/api/profile"
+          headers:
+            Authorization: "Bearer {{ token }}"
+
+      # Update Profile
+      - put:
+          url: "/api/profile"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            bio: "Test user"
+            skillsHave: ["JavaScript"]
+            skillsWant: ["Python"]

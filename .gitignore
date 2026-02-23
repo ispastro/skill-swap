@@ -1,5 +1,15 @@
 node_modules
 # Keep environment variables out of version control
 .env
+.env.local
+.env.production
 
 /src/generated/prisma
+
+# Build output
+dist/
+*.log
+
+# Documentation (keep locally, don't commit)
+*.md
+!README.md

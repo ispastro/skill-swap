@@ -28,7 +28,7 @@ export async function getPythonMatches(userId: string): Promise<PythonMatchRespo
     return await response.json() as PythonMatchResponse;
   } catch (error) {
     clearTimeout(timeout);
-    console.error('❌ Python matching service error:', error);
+    console.error(' Python matching service error:', error);
     throw error;
   }
 }
