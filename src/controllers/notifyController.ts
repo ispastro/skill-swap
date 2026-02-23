@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db.js';
 import winston from 'winston';
-import { calculateWeightedMatchScore } from './matchController.js';
+
 import { checkProfileCompletion } from '../utils/profileUtils.js';
 
 const logger = winston.createLogger({
@@ -17,55 +17,22 @@ export const notifyNewMatches = async (req: Request, res: Response): Promise<Res
             return res.status(400).json({ message: 'No user data provided' });
         }
 
-        // Fetch full user with normalized skills for matching
         const updatedUser = await prisma.user.findUnique({
             where: { id: rawUser.id },
             select: {
                 id: true, name: true, bio: true,
                 skillsHave: true, skillsWant: true,
-                normalizedSkillsHave: true, normalizedSkillsWant: true,
             },
         });
         if (!updatedUser) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        const users = await prisma.user.findMany({
-            where: { id: { not: updatedUser.id } },
-            select: {
-                id: true, name: true, bio: true,
-                skillsHave: true, skillsWant: true,
-                normalizedSkillsHave: true, normalizedSkillsWant: true,
-            },
-            take: 200,
-        });
-
-        const notificationsSent: { recipientId: string; message: string }[] = [];
-        for (const user of users) {
-            const result = await calculateWeightedMatchScore(updatedUser, user);
-            if (result.matchScore >= 80) {
-                const message = `You have a new match with ${updatedUser.name} (${result.matchScore}% match)`;
-                await prisma.notification.create({
-                    data: {
-                        senderId: updatedUser.id,
-                        recipientId: user.id,
-                        message,
-                    },
-                });
-                req.io?.to(user.id).emit('notification', {
-                    notificationId: `${updatedUser.id}-${user.id}-${Date.now()}`,
-                    message,
-                    sender: { id: updatedUser.id, name: updatedUser.name },
-                });
-                notificationsSent.push({ recipientId: user.id, message });
-                logger.info(`Match notification sent to ${user.id}: ${message}`);
-            }
-        }
-
         const { profileCompleted, missing } = checkProfileCompletion(updatedUser);
         const responseMessage = profileCompleted
-            ? '🎉 Profile updated successfully! Matches notified.'
-            : '✅ Profile updated, but still incomplete. Matches notified.';
+            ? '🎉 Profile updated successfully!'
+            : '✅ Profile updated, but still incomplete.';
+        
         return res.status(200).json({
             message: responseMessage,
             user: updatedUser,

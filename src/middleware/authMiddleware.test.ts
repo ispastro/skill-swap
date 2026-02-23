@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import authMiddleware from '../authMiddleware';
+import authMiddleware from './authMiddleware.js';
 
 describe('authMiddleware', () => {
   let req: Partial<Request>;

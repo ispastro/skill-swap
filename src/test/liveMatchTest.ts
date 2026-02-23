@@ -21,13 +21,13 @@ async function runLiveTest() {
         const normWantA = await normalizeSkills(skillsWantA);
 
         console.log('Creating User A...');
-        const userA = await prisma.user.upsert({
+        await prisma.user.upsert({
             where: { email: userA_Email },
             update: {},
             create: {
                 name: 'Matcher A',
                 email: userA_Email,
-                password: 'HashedPassword123!', // Doesn't matter for this direct DB test
+                password: 'HashedPassword123!',
                 skillsHave: skillsHaveA,
                 skillsWant: skillsWantA,
                 normalizedSkillsHave: normHaveA,
@@ -44,7 +44,7 @@ async function runLiveTest() {
         const normWantB = await normalizeSkills(skillsWantB);
 
         console.log('Creating User B...');
-        const userB = await prisma.user.upsert({
+        await prisma.user.upsert({
             where: { email: userB_Email },
             update: {},
             create: {
@@ -63,25 +63,12 @@ async function runLiveTest() {
         console.log('Ensuring embeddings exist for skills...');
         await ensureSkillEmbeddings([...skillsHaveA, ...skillsWantA, ...skillsHaveB, ...skillsWantB]);
 
-        // 4. Manually trigger the matching logic for User A
-        console.log('\n--- Running Match Engine Logic ---');
-
-        // We'll import the matching controller logic directly to test the calculation
-        const { calculateWeightedMatchScore } = await import('../controllers/matchController.js');
-
-        const result = await calculateWeightedMatchScore(userA as any, userB as any);
-
-        console.log(`\nMatch Result between User A and User B:`);
-        console.log(`Score: ${result.matchScore}%`);
-        console.log(`Confidence: ${result.matchConfidence}`);
-        console.log(`Matched (What A gets from B):`, result.matchedHave);
-        console.log(`Matched (What B gets from A):`, result.matchedWant);
-
-        if (result.matchScore > 50) {
-            console.log('\n✅ SUCCESS: Matching engine correctly identified the relationship!');
-        } else {
-            console.log('\n❌ FAILURE: Match score too low for perfect overlap.');
-        }
+        // 4. Test complete - matching now handled by Python service
+        console.log('\n--- Match Engine Test ---');
+        console.log('✅ Users created successfully');
+        console.log('✅ Embeddings generated');
+        console.log('Note: Matching is now handled by Python service');
+        console.log('To test matching, use the API endpoint: GET /api/match/matches');
 
         // 5. Cleanup
         console.log('\nCleaning up test users...');

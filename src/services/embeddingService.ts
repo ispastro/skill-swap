@@ -1,5 +1,4 @@
 import prisma from '../config/db.js';
-import redis from '../config/redisClient.js';
 import { normalizeSkillName } from '../utils/skillTaxonomy.js';
 
 const EMBEDDING_PROVIDER = process.env.EMBEDDING_PROVIDER || 'cohere'; // 'cohere' or 'huggingface'
