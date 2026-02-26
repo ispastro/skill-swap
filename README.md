@@ -464,17 +464,6 @@ User ──< File
 - Document complex logic
 - Run `npm test` before committing
 
-## Roadmap
-
-- [ ] GraphQL API layer
-- [ ] Advanced analytics dashboard
-- [ ] Mobile app integration
-- [ ] Video call integration
-- [ ] Payment gateway integration
-- [ ] Multi-language support
-- [ ] Advanced ML recommendations
-- [ ] Blockchain skill verification
-
 ## License
 
 This project is licensed under the ISC License.
