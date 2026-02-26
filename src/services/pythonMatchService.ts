@@ -21,6 +21,15 @@ export async function getPythonMatches(userId: string): Promise<PythonMatchRespo
 
     clearTimeout(timeout);
 
+    if (response.status === 404) {
+      // User not found in Python service database - return empty matches
+      return {
+        matches: [],
+        totalMatches: 0,
+        message: 'No matches found. Please update your profile with skills.'
+      };
+    }
+
     if (!response.ok) {
       throw new Error(`Python service returned ${response.status}`);
     }
