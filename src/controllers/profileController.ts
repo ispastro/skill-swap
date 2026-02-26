@@ -5,6 +5,11 @@ import { normalizeSkills } from './matchController.js';
 
 export const getUserProfile = async (req: Request, res: Response): Promise<Response> => {
   const userId = req.user?.id;
+  
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -15,6 +20,8 @@ export const getUserProfile = async (req: Request, res: Response): Promise<Respo
         bio: true,
         skillsHave: true,
         skillsWant: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -22,13 +29,7 @@ export const getUserProfile = async (req: Request, res: Response): Promise<Respo
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const { profileCompleted, missing } = checkProfileCompletion(user);
-
-    return res.status(200).json({
-      user,
-      profileCompleted,
-      ...(missing.length > 0 && { missing }),
-    });
+    return res.status(200).json(user);
   } catch (error) {
     console.error('Error in getUserProfile:', error instanceof Error ? error.message : error);
     return res.status(500).json({
