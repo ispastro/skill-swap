@@ -4,10 +4,10 @@
   "main": "server.js",
   "scripts": {
     "test": "jest --detectOpenHandles --forceExit",
-    "start": "node dist/server.js",
+    "start": "tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start:prod": "node dist/server.js",
+    "build": "echo 'No build needed - using tsx'",
+    "start:prod": "tsx src/server.ts",
     "type-check": "tsc --noEmit"
   },
   "keywords": [],
