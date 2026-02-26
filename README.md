@@ -483,7 +483,7 @@ This project is licensed under the ISC License.
 
 - **Documentation**: [GitHub Wiki](https://github.com/ispastro/skill-swap/wiki)
 - **Issues**: [GitHub Issues](https://github.com/ispastro/skill-swap/issues)
-- **Email**: support@skillswap.com
+- **Email**: haileasaye51@gmail.com
 
 ## Acknowledgments
 
@@ -495,4 +495,4 @@ This project is licensed under the ISC License.
 
 ---
 
-**Made with ❤️ by the SkillSwap Team**
+**Made with ❤️ by [Haile](https://github.com/ispastro)**
